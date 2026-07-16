@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#4f6ef7" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="账本" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
 <title>工程账本 · 链接/密码管理</title>
 <style>
   :root{--bg:#f4f6fb;--panel:#fff;--ink:#1f2733;--muted:#6b7785;--line:#e6eaf0;
@@ -454,6 +461,14 @@ function openLog(){
 // ============================ 深色模式 ============================
 function toggleDark(){document.body.classList.toggle('dark');const d=document.body.classList.contains('dark');localStorage.setItem('vm_dark',d?'1':'0');$('darkBtn').textContent=d?'☀️':'🌙';}
 (function(){if(localStorage.getItem('vm_dark')==='1'){document.body.classList.add('dark');$('darkBtn').textContent='☀️';}})();
+</script>
+<script>
+  // PWA: register service worker for installable, offline-capable shell.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW registration failed:', e));
+    });
+  }
 </script>
 </body>
 </html>

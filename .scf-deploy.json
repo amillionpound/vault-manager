@@ -1,0 +1,13 @@
+{
+  "function_name": "vlt-mgr",
+  "namespace": "default",
+  "region": "ap-guangzhou",
+  "files": [
+    "app.py",
+    "scf_bootstrap",
+    "requirements.txt"
+  ],
+  "deps": ["flask>=3.0", "Werkzeug>=3.0", "Jinja2>=3.1"],
+  "runtime": "Python3.10",
+  "access_url": "https://1256784020-5x5qs04wi9.ap-guangzhou.tencentscf.com"
+}

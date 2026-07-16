@@ -1,0 +1,5 @@
+vendor/
+deploy.zip
+__pycache__/
+*.pyc
+.venv/

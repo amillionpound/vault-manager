@@ -114,10 +114,10 @@ async function api(path,opts={}){
 function openModal(html){$('modal').innerHTML=html;$('modalBg').classList.remove('hidden');}
 function closeModal(){$('modalBg').classList.add('hidden');}
 function openSettings(){
-  const cur=localStorage.getItem('vlt_api_base')||'';
+  const cur=localStorage.getItem('vlt_api_base')||'https://1256784020-5x5qs04wi9.ap-guangzhou.tencentscf.com';
   openModal(`<h3>设置 SCF API 地址</h3>
     <div class="sub">前端托管在 CloudStudio / GitHub Pages（与 SCF 不同源），需填写 SCF（API 服务）的访问地址，例如：<br><code>https://vlt-mgr-xxxx.apigw.tencentcs.com/release</code></div>
-    <div class="field"><label>SCF API 地址</label><input id="f_api" value="${esc(cur)}" placeholder="https://...apigw.tencentcs.com/release"></div>
+    <div class="field"><label>SCF API 地址</label><input id="f_api" value="${esc(cur)}" placeholder="https://xxx.ap-guangzhou.tencentscf.com"></div>
     <div class="bar"><button class="btn-p" onclick="saveSettings()">保存</button><button class="btn-s" onclick="closeModal()">取消</button></div>`);
 }
 function saveSettings(){

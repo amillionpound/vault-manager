@@ -105,7 +105,9 @@ def cos_get(key):
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return None
-        raise
+        return None  # 其他 HTTP 错误（权限/桶不存在等）按“不可用”处理，避免 500
+    except Exception:
+        return None
 
 
 def cos_put(key, data, ctype='application/json'):
@@ -166,12 +168,12 @@ def save_sys(o):
 
 
 def load_auth():
-    raw = cos_get(AUTH_KEY)
-    if raw:
-        try:
+    try:
+        raw = cos_get(AUTH_KEY)
+        if raw:
             return json.loads(raw)
-        except Exception:
-            return None
+    except Exception:
+        return None
     return None
 
 

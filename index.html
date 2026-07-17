@@ -653,9 +653,35 @@ function showLogin(err){
   const lp2El=$('#lp2'); if(lp2El)lp2El.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doLgo();}});
 }
 function openSecretGate(){
+  const enabled=!!(state.auth&&state.auth.saltS&&state.auth.wrapSecretBySecret);
+  if(!enabled){
+    // 绝密区尚未启用（如修复初始化时留空）——提供首次设置入口
+    const m=overlay(`<div class="box"><h3>🔒 启用绝密区</h3><p style="color:var(--muted);font-size:13px;margin:0 0 10px">绝密区尚未设置密码。请设置一个绝密区密码来启用（<b>忘记无法恢复</b>，与主密码相互独立）。</p><div class="field"><input id="sp" type="password" placeholder="设置绝密区密码"></div><div class="field"><input id="sp2" type="password" placeholder="再次输入绝密区密码"></div><div class="foot"><button class="btn ghost" id="c">取消</button><button class="btn" id="ok">启用</button></div></div>`);
+    const doEnable=async()=>{
+      const sp=$('#sp').value,sp2=$('#sp2').value;
+      if(!sp){toast('请输入绝密区密码',true);return;}
+      if(sp!==sp2){toast('两次输入不一致',true);return;}
+      try{
+        const saltS=genSalt(),kek=await deriveKey(sp,saltS);const dekS=rnd(32);const wrap=await wrapDEK(kek,dekS);
+        const r=await api('/api/auth',{method:'PUT',body:{saltS,wrapSecretBySecret:wrap}});
+        if(r.data.code!==0){toast('启用失败：'+(r.data.msg||''),true);return;}
+        state.auth.saltS=saltS;state.auth.wrapSecretBySecret=wrap;state.secretKey=dekS;
+        closeOverlay(m);render();toast('绝密区已启用并解锁');
+      }catch(e){toast('启用出错：'+((e&&e.message)||e),true);}
+    };
+    $('#ok').onclick=doEnable;
+    $('#c').onclick=()=>closeOverlay(m);
+    $('#sp').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#sp2').focus();}};
+    $('#sp2').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();doEnable();}};
+    setTimeout(()=>$('#sp')&&$('#sp').focus(),50);
+    return;
+  }
   const m=overlay(`<div class="box"><h3>🔒 绝密区验证</h3><div class="field"><input id="sp" type="password" placeholder="绝密区密码"></div><div class="foot"><button class="btn ghost" id="c">取消</button><button class="btn" id="ok">解锁</button></div></div>`);
-  $('#ok').onclick=async()=>{const r=await unlockSecret($('#sp').value);if(r.ok){closeOverlay(m);render();toast('绝密区已解锁');}else toast(r.err||'失败',true);};
+  const doUnlock=async()=>{const r=await unlockSecret($('#sp').value);if(r.ok){closeOverlay(m);render();toast('绝密区已解锁');}else toast(r.err||'失败',true);};
+  $('#ok').onclick=doUnlock;
   $('#c').onclick=()=>closeOverlay(m);
+  $('#sp').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();doUnlock();}};
+  setTimeout(()=>$('#sp')&&$('#sp').focus(),50);
 }
 function enterApp(){$('#gate').className='hidden';$('#gate').innerHTML='';$('#app').classList.remove('hidden');applyTheme(localStorage.getItem('vlt_theme')||state.data.settings?.theme||'light');render();toast('已解锁');}
 function applyTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('vlt_theme',t);}

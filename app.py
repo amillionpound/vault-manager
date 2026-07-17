@@ -23,11 +23,17 @@ import hashlib
 import hmac
 import secrets
 import struct
-import urllib.request
-import urllib.error
-import urllib.parse
-import xml.etree.ElementTree as ET
 from flask import Flask, request, jsonify, Response
+
+# COS Python SDK（腾讯云官方）：负责签名 + PUT/GET/DELETE/LIST，已随包打包进 vendor/。
+# 相比此前手写的 urllib 签名客户端，官方 SDK 在 SCF 出网环境下对 PUT 带 body 的请求更稳健。
+try:
+    from qcloud_cos import CosConfig, CosS3Client
+    from qcloud_cos.cos_exception import CosServiceError
+    _COS_OK = True
+except Exception:
+    CosConfig = CosS3Client = CosServiceError = None
+    _COS_OK = False
 
 VENDOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vendor')
 if os.path.isdir(VENDOR):
@@ -51,7 +57,6 @@ COS_BUCKET = os.environ.get('COS_BUCKET', '')
 COS_REGION = os.environ.get('COS_REGION', 'ap-guangzhou')
 COS_SECRET_ID = os.environ.get('COS_SECRET_ID', '')
 COS_SECRET_KEY = os.environ.get('COS_SECRET_KEY', '')
-COS_HOST = '{bucket}.cos.{region}.myqcloud.com'.format(bucket=COS_BUCKET, region=COS_REGION)
 ADMIN_TOTP_SECRET = os.environ.get('ADMIN_TOTP_SECRET', '').strip().upper()  # 可选 TOTP
 
 AUTH_KEY = 'auth.json'
@@ -75,72 +80,73 @@ def b64u_encode(b):
     return base64.urlsafe_b64encode(b).decode('ascii')
 
 
-# ------------------------- COS 原生签名 -------------------------
-def cos_sign(method, uri):
-    now = int(time.time())
-    key_time = '{now};{end}'.format(now=now - 60, end=now + 600)
-    sign_key = hmac.new(COS_SECRET_KEY.encode('utf-8'), key_time.encode('utf-8'), hashlib.sha1).hexdigest()
-    fmt = '{method}\n{uri}\n\nhost={host}\n'.format(method=method.lower(), uri=uri, host=COS_HOST)
-    digest = hashlib.sha1(fmt.encode('utf-8')).hexdigest()
-    sts = 'sha1\n{key_time}\n{digest}\n'.format(key_time=key_time, digest=digest)
-    sig = hmac.new(sign_key.encode('utf-8'), sts.encode('utf-8'), hashlib.sha1).hexdigest()
-    return ('q-sign-algorithm=sha1&q-ak={ak}&q-sign-time={kt}&q-key-time={kt}'
-            '&q-header-list=host&q-url-param-list=&q-signature={sig}').format(
-        ak=COS_SECRET_ID, kt=key_time, sig=sig)
+# ------------------------- COS 客户端（官方 SDK） -------------------------
+_cos_client = None
 
 
-def _cos_req(method, key, data=None, ctype='application/json', extra_query=''):
-    uri = '/' + key
-    auth = cos_sign(method, uri)
-    url = 'https://{host}{uri}?{auth}{extra}'.format(host=COS_HOST, uri=uri, auth=auth, extra=extra_query)
-    headers = {'Host': COS_HOST, 'Content-Type': ctype}
-    if data is not None:
-        # 强制 Content-Length，避免 urllib 对带 body 的请求改用 chunked 被前置 nginx 拒（400）
-        headers['Content-Length'] = str(len(data))
-    req = urllib.request.Request(url, data=data, method=method, headers=headers)
-    return urllib.request.urlopen(req, timeout=10)
+def _get_cos():
+    """惰性创建 COS 客户端（全局单例，避免重复初始化）。"""
+    global _cos_client
+    if _cos_client is None and COS_SECRET_ID and COS_SECRET_KEY and COS_BUCKET:
+        cfg = CosConfig(Region=COS_REGION, SecretId=COS_SECRET_ID, SecretKey=COS_SECRET_KEY)
+        _cos_client = CosS3Client(cfg)
+    return _cos_client
 
 
 def cos_get(key):
+    """读取对象；不存在返回 None；其他异常也返回 None（避免 500，由调用方决定行为）。"""
+    c = _get_cos()
+    if not c:
+        return None
     try:
-        with _cos_req('get', key) as r:
-            return r.read()
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
+        resp = c.get_object(Bucket=COS_BUCKET, Key=key)
+        body = resp['Body']
+        try:
+            return body.get_raw_stream().read()
+        except Exception:
+            return body.read()
+    except CosServiceError as e:
+        if e.get_status_code() == 404:
             return None
-        return None  # 其他 HTTP 错误（权限/桶不存在等）按“不可用”处理，避免 500
+        return None
     except Exception:
         return None
 
 
 def cos_put(key, data, ctype='application/json'):
-    with _cos_req('put', key, data=data, ctype=ctype) as r:
-        return r.read()
+    c = _get_cos()
+    if not c:
+        raise RuntimeError('COS 未配置（缺少 COS_SECRET_ID/KEY/BUCKET）')
+    c.put_object(Bucket=COS_BUCKET, Body=data, Key=key, ContentType=ctype)
 
 
 def cos_delete(key):
+    c = _get_cos()
+    if not c:
+        return
     try:
-        with _cos_req('delete', key) as r:
-            return r.read()
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return None
-        raise
+        c.delete_object(Bucket=COS_BUCKET, Key=key)
+    except Exception:
+        pass
 
 
 def cos_list(prefix):
     """列出某前缀下的对象 Key（用于批量删除）。"""
-    auth = cos_sign('get', '/')
-    q = urllib.parse.urlencode({'prefix': prefix})
-    url = 'https://{host}/?{q}&{auth}'.format(host=COS_HOST, q=q, auth=auth)
-    req = urllib.request.Request(url, method='GET', headers={'Host': COS_HOST})
-    with urllib.request.urlopen(req, timeout=10) as r:
-        body = r.read()
-    root = ET.fromstring(body)
+    c = _get_cos()
+    if not c:
+        return []
     keys = []
-    for elem in root.iter():
-        if elem.tag.endswith('Key') and elem.text:
-            keys.append(elem.text)
+    marker = ''
+    while True:
+        resp = c.list_objects(Bucket=COS_BUCKET, Prefix=prefix, Marker=marker)
+        for item in resp.get('Contents', []):
+            keys.append(item['Key'])
+        if resp.get('IsTruncated') == 'true':
+            marker = resp.get('NextMarker', '') or (keys[-1] if keys else '')
+            if not marker:
+                break
+        else:
+            break
     return keys
 
 
@@ -270,28 +276,36 @@ def api_options(path=''):
 
 @app.route('/api/health')
 def health():
-    out = {'code': 0, 'ok': True, 'cos': bool(COS_BUCKET),
-           'initialized': load_auth() is not None, 'totp': bool(ADMIN_TOTP_SECRET)}
+    out = {
+        'code': 0, 'ok': True,
+        'cos': bool(COS_BUCKET and COS_SECRET_ID and COS_SECRET_KEY),
+        'cos_sdk': _COS_OK,
+        'initialized': load_auth() is not None,
+        'totp': bool(ADMIN_TOTP_SECRET),
+    }
+    c = _get_cos()
+    if not c:
+        out['cos_err'] = 'COS 未配置（缺少 COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET 环境变量）'
+        return jsonify(out)
+    # GET 探测：404 视为正常（桶可达、权限 OK）
     try:
-        cos_get('__probe_get__')
-        out['cos_get'] = 'ok_or_404'
-    except Exception as ex:
-        out['cos_get_err'] = str(ex)[:200]
+        c.get_object(Bucket=COS_BUCKET, Key='__probe_get__')
+        out['cos_get'] = 'ok'
+    except CosServiceError as e:
+        if e.get_status_code() == 404:
+            out['cos_get'] = 'ok_or_404'
+        else:
+            out['cos_get_err'] = str(e)[:200]
+    except Exception as e:
+        out['cos_get_err'] = str(e)[:200]
+    # PUT 探测：写一条再删，验证写入链路
     try:
-        cos_put('__probe__', b'1')
-        cos_delete('__probe__')
+        c.put_object(Bucket=COS_BUCKET, Body=b'1', Key='__probe__', ContentType='application/octet-stream')
+        c.delete_object(Bucket=COS_BUCKET, Key='__probe__')
         out['cos_write'] = True
-    except urllib.error.HTTPError as ex:
-        body = ''
-        try:
-            body = ex.read().decode('utf-8', 'ignore')[:400]
-        except Exception:
-            pass
+    except Exception as e:
         out['cos_write'] = False
-        out['cos_err'] = 'HTTP %s: %s' % (ex.code, body)
-    except Exception as ex:
-        out['cos_write'] = False
-        out['cos_err'] = str(ex)[:200]
+        out['cos_err'] = str(e)[:300]
     return jsonify(out)
 
 

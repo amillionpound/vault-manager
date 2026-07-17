@@ -7,7 +7,7 @@
     "scf_bootstrap",
     "requirements.txt"
   ],
-  "deps": ["flask>=3.0", "Werkzeug>=3.0", "Jinja2>=3.1"],
+  "deps": ["flask>=3.0", "Werkzeug>=3.0", "Jinja2>=3.1", "cos-python-sdk-v5", "pycryptodome", "crcmod"],
   "runtime": "Python3.10",
   "access_url": "https://1256784020-5x5qs04wi9.ap-guangzhou.tencentscf.com"
 }

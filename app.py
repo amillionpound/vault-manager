@@ -267,8 +267,16 @@ def api_options(path=''):
 
 @app.route('/api/health')
 def health():
-    return jsonify({'code': 0, 'ok': True, 'cos': bool(COS_BUCKET),
-                    'initialized': load_auth() is not None, 'totp': bool(ADMIN_TOTP_SECRET)})
+    out = {'code': 0, 'ok': True, 'cos': bool(COS_BUCKET),
+           'initialized': load_auth() is not None, 'totp': bool(ADMIN_TOTP_SECRET)}
+    try:
+        cos_put('__probe__', b'1')
+        cos_delete('__probe__')
+        out['cos_write'] = True
+    except Exception as ex:
+        out['cos_write'] = False
+        out['cos_err'] = str(ex)[:200]
+    return jsonify(out)
 
 
 # ---------- 首次引导：环境 ADMIN_PWD 防陌生人抢注，写入 auth.json 后环境哈希即失效 ----------

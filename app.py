@@ -273,6 +273,14 @@ def health():
         cos_put('__probe__', b'1')
         cos_delete('__probe__')
         out['cos_write'] = True
+    except urllib.error.HTTPError as ex:
+        body = ''
+        try:
+            body = ex.read().decode('utf-8', 'ignore')[:400]
+        except Exception:
+            pass
+        out['cos_write'] = False
+        out['cos_err'] = 'HTTP %s: %s' % (ex.code, body)
     except Exception as ex:
         out['cos_write'] = False
         out['cos_err'] = str(ex)[:200]

@@ -249,6 +249,10 @@ async function doLogin(pw,totp){
     if(r.data.code!==0)return{err:r.data.msg||'登录失败',lock:r.data.lock,retry_after:r.data.retry_after};
     state.accessToken=r.data.token;state.accessExp=now()+ACCESS_MS;state.refreshToken=r.data.refreshToken;state.totpRequired=r.data.totp_required;
     state.auth=r.data.auth;
+    // 防御性检查：auth 必须包含解密所需字段
+    if(!state.auth||!state.auth.saltM||!state.auth.wrapNormalByMaster){
+      return{err:'登录数据不完整（服务端返回异常），请尝试「重置系统」或联系管理员'};
+    }
     const kekM=await deriveKey(pw,state.auth.saltM);
     state.vaultKey=await unwrapDEK(kekM,state.auth.wrapNormalByMaster);
     cacheSession();
@@ -278,14 +282,9 @@ async function doSetup(pw,secretPw,recoveryPw){
   state.data=newVault();
   return{ok:true};
 }
-async function doForceReset(){
-  const adminPw=prompt('重置将清空全部数据（普通区/绝密区/上传/分享），且不可恢复。\n请输入你在 SCF 环境变量里设置的「管理员密码 ADMIN_PWD」（即该密文对应的原始明文）以授权：');
-  if(!adminPw)return;
-  const pwHash=await sha256hex(adminPw);
-  const r=await api('/api/force_reset',{method:'POST',body:{pwHash}});
-  if(r.data.code!==0){toast(r.data.msg||'重置失败',true);return;}
-  toast('已清空，请重新初始化');state.needSetup=true;showLogin();
-}
+/* doForceReset 已移除：重置系统功能不再在登录页暴露（防误触/社工风险）。
+   如需紧急清库，可直接在浏览器控制台调用 fetch(API_BASE+'/api/force_reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwHash:...})})
+   或通过 SCF 控制台手动删除 COS 桶内文件。后端 /api/force_reset 端点保留，仍需 ADMIN_PWD 鉴权。 */
 async function unlockSecret(secretPw){
   if(!state.auth||!state.auth.saltS||!state.auth.wrapSecretBySecret)return{err:'未启用绝密区'};
   const kekS=await deriveKey(secretPw,state.auth.saltS);
@@ -577,6 +576,11 @@ async function copyText(text){if(!text)return;try{await navigator.clipboard.writ
   toast('已复制');logAction('copy');const sec=state.data.settings?.clipboardClear||0;if(sec>0)setTimeout(()=>{try{navigator.clipboard.writeText('');}catch(e){}},sec*1000);}
 
 /* ============== 登录门 ============== */
+async function doLgo(){
+    const pw=$('#lp').value;if(!pw)return;
+    if(state.needSetup){if(pw!==$('#lp2').value){toast('两次密码不一致',true);return;}const r=await doSetup(pw,$('#lsp').value,$('#lrp').value);if(r.ok){enterApp();}else toast(r.err||'失败',true);}
+    else{const r=await doLogin(pw,$('#lt')?.value||'');if(r.ok)enterApp();else if(r.needSetup){state.needSetup=true;showLogin();}else{showLogin(r.err);}}
+}
 function showLogin(err){
   const g=$('#gate');g.className='lockwrap';
   g.innerHTML=`<div class="lockcard"><div class="big">🔐</div><h2>工程账本</h2>
@@ -589,15 +593,11 @@ function showLogin(err){
       <div class="field"><input id="lrp" type="password" placeholder="应急恢复密码 R（可选）"></div>`:''}
     <button class="btn" id="lgo" style="width:100%">${state.needSetup?'初始化':'解锁'}</button>
     ${err&&err.lock?'<p style="color:var(--warn);margin-top:10px">已被锁定，请稍后再试</p>':''}
-    ${!state.needSetup?'<p style="margin-top:14px"><a href="#" id="rst" style="color:var(--muted);font-size:13px">忘记密码？重置系统（清空全部数据后重新初始化）</a></p>':''}
   </div>`;
-  $('#lgo').onclick=async()=>{
-    const pw=$('#lp').value;if(!pw)return;
-    if(state.needSetup){if(pw!==$('#lp2').value){toast('两次密码不一致',true);return;}const r=await doSetup(pw,$('#lsp').value,$('#lrp').value);if(r.ok){enterApp();}else toast(r.err||'失败',true);}
-    else{const r=await doLogin(pw,$('#lt')?.value||'');if(r.ok)enterApp();else if(r.needSetup){state.needSetup=true;showLogin();}else{showLogin(r.err);}}
-  };
-  const rstEl=$('#rst');
-  if(rstEl)rstEl.onclick=async(e)=>{e.preventDefault();await doForceReset();};
+  $('#lgo').onclick=doLgo;
+  // 回车键触发解锁/初始化
+  const lpEl=$('#lp'); if(lpEl)lpEl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doLgo();}});
+  const lp2El=$('#lp2'); if(lp2El)lp2El.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doLgo();}});
 }
 function openSecretGate(){
   const m=overlay(`<div class="box"><h3>🔒 绝密区验证</h3><div class="field"><input id="sp" type="password" placeholder="绝密区密码"></div><div class="foot"><button class="btn ghost" id="c">取消</button><button class="btn" id="ok">解锁</button></div></div>`);

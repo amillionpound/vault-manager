@@ -1,5 +1,5 @@
 // vault-manager PWA service worker — app-shell cache, network for API.
-const CACHE = 'vlt-pwa-v5';
+const CACHE = 'vlt-pwa-v6';
 const SHELL = [
   './',
   './index.html',

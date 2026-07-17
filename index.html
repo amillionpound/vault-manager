@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>工程账本 · 链接/密码管理</title>
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#4f6ef7" />
@@ -186,7 +189,7 @@ async function ensureToken(){
   throw{needLogin:true};
 }
 async function api(path,opts={}){
-  const secured=!['/api/login','/api/bootstrap','/api/refresh','/api/recover/verify','/api/recover/setnew','/api/health','/api/force_reset'].some(p=>path.startsWith(p))&&!/^\/api\/share\//.test(path);
+  const secured=!['/api/login','/api/bootstrap','/api/repair_bootstrap','/api/refresh','/api/recover/verify','/api/recover/setnew','/api/health','/api/force_reset'].some(p=>path.startsWith(p))&&!/^\/api\/share\//.test(path);
   if(secured){try{await ensureToken();}catch(e){if(e.needLogin)return{status:401,data:{code:1,msg:'需重新登录'}};throw e;}}
   const headers={'Content-Type':'application/json'};
   if(state.accessToken)headers['Authorization']='Bearer '+state.accessToken;
@@ -251,7 +254,11 @@ async function doLogin(pw,totp){
     state.auth=r.data.auth;
     // 防御性检查：auth 必须包含解密所需字段
     if(!state.auth||!state.auth.saltM||!state.auth.wrapNormalByMaster){
-      return{err:'登录数据不完整（服务端返回异常），请尝试「重置系统」或联系管理员'};
+      // auth.json 数据不完整，提供修复入口
+      if(confirm('登录数据不完整（服务端返回异常）。\n\n这可能是因为之前重置/清库后初始化未完成。\n\n是否用「管理员密码」修复并重新初始化？')){
+        return await doRepairBootstrap(pw);
+      }
+      return{err:'登录数据不完整（服务端返回异常），请尝试修复初始化'};
     }
     const kekM=await deriveKey(pw,state.auth.saltM);
     state.vaultKey=await unwrapDEK(kekM,state.auth.wrapNormalByMaster);
@@ -285,6 +292,42 @@ async function doSetup(pw,secretPw,recoveryPw){
 /* doForceReset 已移除：重置系统功能不再在登录页暴露（防误触/社工风险）。
    如需紧急清库，可直接在浏览器控制台调用 fetch(API_BASE+'/api/force_reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwHash:...})})
    或通过 SCF 控制台手动删除 COS 桶内文件。后端 /api/force_reset 端点保留，仍需 ADMIN_PWD 鉴权。 */
+async function doRepairBootstrap(loginPw){
+  try{
+    const loginHash=await sha256hex(loginPw);
+    const saltM=genSalt(),kekM=await deriveKey(loginPw,saltM);
+    const vaultKey=crypto.getRandomValues(new Uint8Array(32));
+    const wrapNormalByMaster=await wrapDEK(kekM,vaultKey);
+    let saltR,wrapNormalByRecovery;
+    const recoveryPw=prompt('请输入恢复密码（留空则不启用应急恢复）：');
+    if(recoveryPw){
+      saltR=genSalt();const kekR=await deriveKey(recoveryPw,saltR);
+      wrapNormalByRecovery=await wrapDEK(kekR,vaultKey);
+    }
+    let saltS,wrapSecretBySecret;
+    const secretPw=prompt('请输入绝密区密码（留空则不启用绝密区）：');
+    if(secretPw){
+      saltS=genSalt();const kekS=await deriveKey(secretPw,saltS);
+      wrapSecretBySecret=await wrapDEK(kekS,crypto.getRandomValues(new Uint8Array(32)));
+    }
+    const r=await api('/api/repair_bootstrap',{method:'POST',body:{
+      loginHash,saltM,wrapNormalByMaster,
+      ...(saltR?{saltR,wrapNormalByRecovery}:{}),
+      ...(saltS?{saltS,wrapSecretBySecret}:{})
+    }});
+    if(r.data.code!==0)return{err:r.data.msg||'修复失败'};
+    state.accessToken=r.data.token;state.accessExp=now()+ACCESS_MS;
+    state.refreshToken=r.data.refreshToken;
+    state.auth={saltM,wrapNormalByMaster,...(saltR?{saltR,wrapNormalByRecovery}:{}),...(saltS?{saltS,wrapSecretBySecret}:{})};
+    state.vaultKey=vaultKey;
+    cacheSession();
+    state.data=newVault();
+    if(secretPw)state.secret=newSecret();
+    await saveVault(true);
+    return{ok:true};
+  }catch(e){return{err:'修复过程出错：'+((e&&e.message)||e)};}
+}
+
 async function unlockSecret(secretPw){
   if(!state.auth||!state.auth.saltS||!state.auth.wrapSecretBySecret)return{err:'未启用绝密区'};
   const kekS=await deriveKey(secretPw,state.auth.saltS);

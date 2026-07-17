@@ -330,6 +330,29 @@ def bootstrap():
     return jsonify({'code': 0, 'token': token, 'refreshToken': refresh, 'totp_required': bool(ADMIN_TOTP_SECRET)})
 
 
+# ---------- 修复引导：auth.json 存在但数据不完整时，用 ADMIN_PWD 覆盖修复 ----------
+# 触发条件：前端登录后发现 auth 缺 saltM/wrapNormalByMaster 等关键字段。
+# 安全性与 bootstrap 完全等价（均需 ADMIN_PWD 证明所有权）。
+@app.route('/api/repair_bootstrap', methods=['POST'])
+def repair_bootstrap():
+    if not ADMIN_PWD_HASH:
+        return jsonify({'code': 3, 'msg': 'SCF 未配置 ADMIN_PWD，无法修复'}), 400
+    d = get_json()
+    pw = (d.get('loginHash') or '').strip().lower()
+    if pw != ADMIN_PWD_HASH:
+        return jsonify({'code': 1, 'msg': '环境 ADMIN_PWD 不匹配'}), 403
+    fields = ('loginHash', 'saltM', 'saltR', 'saltS', 'wrapNormalByMaster', 'wrapNormalByRecovery',
+              'wrapSecretBySecret', 'recoveryId', 'recoveryHash')
+    obj = {k: d[k] for k in fields if k in d}
+    obj['updatedAt'] = int(time.time())
+    save_auth(obj)  # 覆盖写入，修复不完整的 auth.json
+    token = make_token(86400, 'a')
+    refresh = make_token(7 * 86400, 'r')
+    return jsonify({'code': 0, 'token': token, 'refreshToken': refresh,
+                    'totp_required': bool(ADMIN_TOTP_SECRET),
+                    'auth': client_auth_fields(obj)})
+
+
 # ---------- 紧急重置：用环境 ADMIN_PWD 证明部署所有权后清库重来 ----------
 # 适用场景：用户忘记/不匹配 auth.json 密码、无法登录，又无有效恢复密码 R 时。
 # 安全性等价于 bootstrap（都需知道 ADMIN_PWD 自算密钥），且重置后仍需 ADMIN_PWD 才能重新引导，

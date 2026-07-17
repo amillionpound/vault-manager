@@ -161,7 +161,7 @@ async function importDEK(dekBytes){return crypto.subtle.importKey('raw',dekBytes
 async function wrapDEK(kek,dekBytes){const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},kek,dekBytes);return b64u(iv)+':'+b64u(ct);}
 async function unwrapDEK(kek,wrap){const[i,c]=wrap.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},kek,b64d(c));return new Uint8Array(pt);}
 async function encryptJSON(dekBytes,obj){const k=await importDEK(dekBytes);const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,enc.encode(JSON.stringify(obj)));return b64u(iv)+':'+b64u(ct);}
-async function decryptJSON(dekBytes,cipher){const k=await importDEK(dekBytes);const[i,c]=cipher.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},k,b64d(c));return JSON.parse(dec(new Uint8Array(pt)));}
+async function decryptJSON(dekBytes,cipher){if(!cipher||typeof cipher!=='string'||cipher.indexOf(':')<0)throw new Error('密文格式无效');const k=await importDEK(dekBytes);const[i,c]=cipher.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},k,b64d(c));return JSON.parse(dec(new Uint8Array(pt)));}
 async function encryptBuf(dekBytes,buf){const k=await importDEK(dekBytes);const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,buf);return b64u(iv)+':'+b64u(ct);}
 async function decryptBuf(dekBytes,cipher){const k=await importDEK(dekBytes);const[i,c]=cipher.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},k,b64d(c));return pt;}
 
@@ -217,7 +217,7 @@ async function binGet(path){
 /* ============== 存取密文 ============== */
 async function loadVault(){const r=await api('/api/vault');if(r.data.code===0&&r.data.cipher){try{state.data=await decryptJSON(state.vaultKey,r.data.cipher);}catch(e){state.data=newVault();toast('无法解密原有数据（密钥已变更），已显示空白，可通过「设置→导入加密备份」恢复',true);}}else state.data=newVault();}
 async function saveVault(){const c=await encryptJSON(state.vaultKey,state.data);await api('/api/vault',{method:'PUT',body:{cipher:c}});}
-async function loadSecret(){const r=await api('/api/secret');if(r.data.code===0&&r.data.cipher)state.secret=await decryptJSON(state.secretKey,r.data.cipher);else state.secret=newSecret();}
+async function loadSecret(){const r=await api('/api/secret');if(r.data.code===0&&r.data.cipher){try{state.secret=await decryptJSON(state.secretKey,r.data.cipher);}catch(e){state.secret=newSecret();toast('绝密区数据无法解密（密钥不匹配），已显示空白，可用「设置→导入加密备份」恢复',true);}}else state.secret=newSecret();}
 async function saveSecret(){const c=await encryptJSON(state.secretKey,state.secret);await api('/api/secret',{method:'PUT',body:{cipher:c}});}
 function newVault(){return{categories:[],entries:[],trash:[],logs:[],settings:{clipboardClear:15,theme:'light'}};}
 function newSecret(){return{entries:[],trash:[],logs:[]};}
@@ -460,7 +460,7 @@ function bindUserRows(){$('#users')?.querySelectorAll('[data-deluser]').forEach(
 
 /* ============== 分类 ============== */
 $('#btnAddCat').onclick=()=>{const modal=overlay(`<div class="box"><h3>新建分类</h3><div class="field"><label>名称</label><input id="cname"></div><div class="field"><label>图标 emoji</label><input id="cic" value="📁" maxlength="4"></div><div class="foot"><button class="btn ghost" id="cn">取消</button><button class="btn" id="cs">创建</button></div></div>`);
-  $('#cs').onclick=async()=>{const name=$('#cname').value.trim();if(!name)return;state.data.categories.push({id:uid(),name,icon:$('#cic').value||'📁',order:state.data.categories.length});await saveVault();closeOverlay(modal);render();};
+  $('#cs').onclick=async()=>{try{const name=$('#cname').value.trim();if(!name){toast('请输入分类名称',true);return;}const cats=state.data.categories||(state.data.categories=[]);const cat={id:uid(),name,icon:$('#cic').value||'📁',order:cats.length};cats.push(cat);await saveVault();closeOverlay(modal);if(state.view==='secret'){state.view='normal';}state.activeCat=cat.id;render();toast('已创建分类：'+name);}catch(e){toast('创建分类失败：'+((e&&e.message)||e),true);}};
   $('#cn').onclick=()=>closeOverlay(modal);};
 
 /* ============== 工具 / 设置 / 统计 / 分享 / 恢复 / 重置 ============== */
@@ -676,7 +676,7 @@ function openSecretGate(){
     return;
   }
   const m=overlay(`<div class="box"><h3>🔒 绝密区验证</h3><div class="field"><input id="sp" type="password" placeholder="绝密区密码"></div><div class="foot"><button class="btn ghost" id="c">取消</button><button class="btn" id="ok">解锁</button></div></div>`);
-  const doUnlock=async()=>{const r=await unlockSecret($('#sp').value);if(r.ok){closeOverlay(m);render();toast('绝密区已解锁');}else toast(r.err||'失败',true);};
+  const doUnlock=async()=>{try{const r=await unlockSecret($('#sp').value);if(r.ok){closeOverlay(m);render();toast('绝密区已解锁');}else toast(r.err||'失败',true);}catch(e){toast('绝密区解锁出错：'+((e&&e.message)||e),true);}};
   $('#ok').onclick=doUnlock;
   $('#c').onclick=()=>closeOverlay(m);
   $('#sp').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();doUnlock();}};

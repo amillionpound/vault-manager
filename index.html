@@ -217,7 +217,7 @@ async function saveVault(){const c=await encryptJSON(state.vaultKey,state.data);
 async function loadSecret(){const r=await api('/api/secret');if(r.data.code===0&&r.data.cipher)state.secret=await decryptJSON(state.secretKey,r.data.cipher);else state.secret=newSecret();}
 async function saveSecret(){const c=await encryptJSON(state.secretKey,state.secret);await api('/api/secret',{method:'PUT',body:{cipher:c}});}
 function newVault(){return{categories:[],entries:[],trash:[],logs:[],settings:{clipboardClear:15,theme:'light'}};}
-function newSecret(){return{entries:[],logs:[]};}
+function newSecret(){return{entries:[],trash:[],logs:[]};}
 
 /* ============== 登录态 / 解锁 ============== */
 function cacheSession(){
@@ -299,19 +299,20 @@ function curData(){return state.view==='secret'?state.secret:state.data;}
 function render(){
   $$('.cat[data-view]').forEach(c=>c.classList.toggle('active',c.dataset.view===state.view&&state.activeCat==='__all__'&&state.view!=='trash'));
   if(state.view==='trash'){return renderTrash();}
+  const cur=curData();                                       // 绝密区→state.secret，否则→state.data
+  const cats=(state.view==='secret')?[]:(state.data.categories||[]);  // 绝密区无分类
   if(state.view==='secret'){$('#secretTab').classList.add('active');}
   // 分类列表
-  const cats=state.data.categories||[];
-  const counts={};;(state.data.entries||[]).concat(state.data.trash||[]).forEach(e=>{if(e.categoryId)counts[e.categoryId]=(counts[e.categoryId]||0)+1;});
+  const counts={};;(cur.entries||[]).concat(cur.trash||[]).forEach(e=>{if(e.categoryId)counts[e.categoryId]=(counts[e.categoryId]||0)+1;});
   let html='';
-  const allCnt=(state.data.entries||[]).length;
+  const allCnt=(cur.entries||[]).length;
   html+=catRow('__all__','📋','全部',allCnt);
   cats.forEach(c=>html+=catRow(c.id,c.icon||'📁',c.name,counts[c.id]||0));
   $('#catList').innerHTML=html;
   $$('#catList .cat').forEach(c=>c.onclick=()=>{state.activeCat=c.dataset.cat;render();});
   // 条目
   const q=($('#search').value||'').toLowerCase();
-  let entries=(state.data.entries||[]).filter(e=>{
+  let entries=(cur.entries||[]).filter(e=>{
     if(state.activeCat!=='__all__'&&e.categoryId!==state.activeCat)return false;
     if(!q)return true;
     return [e.label,e.url,e.note,...(e.users||[]).flatMap(u=>[u.username,u.note])].join(' ').toLowerCase().includes(q);

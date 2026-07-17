@@ -1,474 +1,631 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="theme-color" content="#4f6ef7" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="账本" />
-<link rel="manifest" href="./manifest.webmanifest" />
-<link rel="apple-touch-icon" href="./icons/icon-192.png" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>工程账本 · 链接/密码管理</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#4f6ef7" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<script src="static/jsqr.js"></script>
+<script src="static/qrcode.min.js"></script>
 <style>
-  :root{--bg:#f4f6fb;--panel:#fff;--ink:#1f2733;--muted:#6b7785;--line:#e6eaf0;
-    --brand:#4f6ef7;--ok:#1faa6b;--danger:#e5484d;--warn:#e8912d;--chip:#eef1f8;--shadow:0 6px 24px rgba(31,39,51,.08)}
-  body.dark{--bg:#15181f;--panel:#1f242e;--ink:#e8ecf2;--muted:#9aa6b5;--line:#2c3340;--chip:#262d39;--shadow:0 6px 24px rgba(0,0,0,.4)}
-  *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-    background:var(--bg);color:var(--ink);line-height:1.5}
-  button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600}
-  input,textarea,select{font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);width:100%}
-  input:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(79,110,247,.15)}
-  .btn-p{background:var(--brand);color:#fff}.btn-s{background:var(--chip);color:var(--ink)}
-  .btn-d{background:transparent;color:var(--danger);border:1px solid var(--line)}
-  .btn-g{background:var(--ok);color:#fff}.hidden{display:none!important}
-  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .wrap{max-width:1100px;margin:0 auto;padding:16px}
-  .head{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 0}
-  .head .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  .title{font-size:18px;font-weight:800;margin:0}
-  .sub{color:var(--muted);font-size:12px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;margin-top:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
-  .card h3{margin:0 0 2px;font-size:16px;display:flex;align-items:center;gap:8px}
-  .badge{font-size:11px;font-weight:700;color:var(--brand);background:var(--chip);border-radius:999px;padding:2px 9px}
-  .desc{color:var(--muted);font-size:13px;margin:6px 0 10px}
-  .link{border-top:1px dashed var(--line);padding:10px 0}
-  .link:first-of-type{border-top:none}
-  .link-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .url{font-size:12px;color:var(--brand);word-break:break-all;margin:3px 0}
-  .up{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;font-size:13px}
-  .note{font-weight:600}.uname{color:var(--muted)}
-  .pw{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--chip);padding:2px 8px;border-radius:6px;letter-spacing:1px}
-  .mini{padding:4px 9px;font-size:12px;border-radius:8px}
-  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
-  .modal-bg{position:fixed;inset:0;background:rgba(20,24,33,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
-  .modal{background:var(--panel);border-radius:16px;padding:18px;width:100%;max-width:480px;box-shadow:var(--shadow);max-height:90vh;overflow:auto}
-  .modal h3{margin:0 0 12px}
-  .field{margin-bottom:11px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
-  .lock{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#4f6ef7,#7b5bff)}
-  .lock .card{width:100%;max-width:360px}
-  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#222c3a;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:50;opacity:0;transition:.25s;pointer-events:none}
-  .toast.show{opacity:1}.toast.err{background:var(--danger)}.toast.ok{background:var(--ok)}
-  .muted{color:var(--muted)}.sm{font-size:12px}.mt8{margin-top:8px}.mt12{margin-top:12px}
-  .hash-out{word-break:break-all;background:var(--chip);padding:10px;border-radius:8px;font-family:ui-monospace,monospace;font-size:13px}
-  .stat{font-size:12px;color:var(--muted)}
+:root{--bg:#f5f6fb;--panel:#fff;--text:#1c2330;--muted:#7a8597;--line:#e6e9f0;--brand:#4f6ef7;--brand-d:#3a57d6;--danger:#e5484d;--ok:#2f9e5e;--warn:#e5a000;
+--shadow:0 6px 24px rgba(30,40,80,.08)}
+[data-theme=dark]{--bg:#11151c;--panel:#1a212c;--text:#e6ebf2;--muted:#8b97a8;--line:#28313f;--shadow:0 6px 24px rgba(0,0,0,.4)}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--text);width:100%;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--brand)}
+.btn{background:var(--brand);color:#fff;padding:9px 16px;border-radius:9px;font-weight:600;font-size:14px}
+.btn:hover{background:var(--brand-d)}.btn.ghost{background:transparent;border:1px solid var(--line)}.btn.danger{background:var(--danger)}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:7px}.btn:disabled{opacity:.5;cursor:not-allowed}
+a{color:var(--brand)}
+.hidden{display:none!important}
+.wrap{max-width:1100px;margin:0 auto;padding:0 14px}
+.topbar{position:sticky;top:0;z-index:30;background:var(--panel);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+.topbar .row{display:flex;align-items:center;gap:10px;padding:10px 0}
+.logo{font-weight:800;font-size:18px;display:flex;align-items:center;gap:8px}
+.logo .dot{width:14px;height:14px;border-radius:5px;background:var(--brand)}
+.search{flex:1;max-width:420px}
+.search input{padding:7px 11px}
+.iconbtn{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;border:1px solid var(--line);background:var(--panel)}
+.iconbtn:hover{border-color:var(--brand)}
+.layout{display:flex;gap:16px;align-items:flex-start;padding-top:16px}
+.side{width:200px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;position:sticky;top:70px}
+.side h4{margin:6px 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.cat{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;cursor:pointer}
+.cat:hover{background:var(--bg)}.cat.active{background:var(--brand);color:#fff}
+.cat .ic{font-size:16px}.cat .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat .ct{font-size:12px;opacity:.7}
+.addcat{margin-top:6px;width:100%;text-align:left;color:var(--brand);padding:8px 10px}
+.main{flex:1;min-width:0}
+.toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow);position:relative}
+.card.pin{box-shadow:0 0 0 2px var(--brand) inset,var(--shadow)}
+.card .hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.card .ttl{font-weight:700;font-size:16px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .typ{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--bg);color:var(--muted)}
+.card .url{color:var(--muted);font-size:13px;margin-bottom:8px;word-break:break-all}
+.card .note{font-size:13px;color:var(--muted);margin-bottom:8px;white-space:pre-wrap;word-break:break-word;max-height:80px;overflow:auto}
+.users{margin:8px 0;border-top:1px dashed var(--line);padding-top:8px}
+.user{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px}
+.user .un{flex:1;overflow:hidden;text-overflow:ellipsis}
+.user .pw{font-family:ui-monospace,monospace;background:var(--bg);padding:2px 7px;border-radius:6px;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.card .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{font-size:12px;padding:4px 9px;border-radius:7px;border:1px solid var(--line);background:var(--panel)}
+.chip:hover{border-color:var(--brand)}
+.qrbox{margin-top:10px;text-align:center}
+.empty{text-align:center;color:var(--muted);padding:60px 20px}
+.modal{position:fixed;inset:0;background:rgba(10,15,25,.5);display:flex;align-items:flex-start;justify-content:center;padding:24px;z-index:50;overflow:auto}
+.modal .box{background:var(--panel);border-radius:16px;width:100%;max-width:560px;padding:22px;margin:auto;box-shadow:var(--shadow)}
+.modal h3{margin:0 0 14px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}
+.field .hint{font-size:12px;color:var(--muted);margin-top:4px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal .foot{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1c2330;color:#fff;padding:10px 18px;border-radius:10px;z-index:99;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1}
+.secret-badge{background:var(--danger);color:#fff;font-size:11px;padding:2px 7px;border-radius:6px}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tab{padding:7px 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel);font-size:13px}
+.tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat .n{font-size:26px;font-weight:800}.stat .l{color:var(--muted);font-size:13px}
+.logline{font-size:13px;padding:6px 0;border-bottom:1px solid var(--line);display:flex;gap:10px}
+.logline .t{color:var(--muted);font-size:12px;white-space:nowrap}
+.imgrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.imgrow img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.lockwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.lockcard{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px;width:100%;max-width:380px;box-shadow:var(--shadow);text-align:center}
+.lockcard .big{font-size:40px;margin-bottom:10px}
+.autounlock{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:80;font-size:15px;color:var(--muted)}
+@media(max-width:720px){.side{display:none}.cards{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<!-- 登录/初始化/自动解锁 覆盖层 -->
+<div id="gate"></div>
 
-<!-- 登录 -->
-<div id="login" class="lock">
-  <div class="card">
-    <div style="font-size:38px;text-align:center;margin-bottom:6px">🔐</div>
-    <h3 style="text-align:center;margin:0 0 4px">工程账本</h3>
-    <div class="sub tc" style="text-align:center;margin-bottom:16px">输入管理员密码解锁</div>
-    <div class="field"><label>密码</label><input id="pw" type="password" placeholder="管理员密码" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div id="totpBox" class="field hidden"><label>动态码 (TOTP)</label><input id="totp" inputmode="numeric" maxlength="6" placeholder="6 位动态码"></div>
-    <button class="btn-p" style="width:100%" onclick="doLogin()">解锁</button>
-    <div id="loginErr" class="sub err" style="color:var(--danger);text-align:center;margin-top:10px"></div>
-    <div class="sub tc" style="margin-top:12px"><a href="#" onclick="openSettings();return false">⚙ 设置 SCF API 地址</a></div>
-  </div>
-</div>
-
-<!-- 主界面 -->
 <div id="app" class="hidden">
-  <div class="head"><div class="wrap">
-    <div><div class="title">工程账本</div><div class="sub" id="stat"></div></div>
-    <div style="flex:1"></div>
-    <input id="search" placeholder="搜索工程/链接/账号…" style="max-width:240px" oninput="render()">
-    <button class="btn-s" onclick="openSelf()">🧮 自算密钥</button>
-    <button class="btn-s" onclick="exportBackup()">⬇ 导出</button>
-    <button class="btn-s" onclick="importBackup()">⬆ 导入</button>
-    <button class="btn-s" id="darkBtn" onclick="toggleDark()">🌙</button>
-    <button class="btn-s" onclick="openSettings()">⚙</button>
-    <button class="btn-s" onclick="openTrash()">🗑 回收站</button>
-    <button class="btn-s" onclick="openLog()">📜 日志</button>
-    <button class="btn-p" onclick="openProject()">＋ 工程</button>
-    <button class="btn-d" onclick="logout()">退出</button>
+  <div class="topbar"><div class="wrap row">
+    <div class="logo"><span class="dot"></span>工程账本</div>
+    <div class="search"><input id="search" placeholder="搜索名称 / 链接 / 账号 / 备注…" /></div>
+    <button class="iconbtn" id="btnStats" title="统计">📊</button>
+    <button class="iconbtn" id="btnShare" title="只读分享">🔗</button>
+    <button class="iconbtn" id="btnRecover" title="应急恢复">🛟</button>
+    <button class="iconbtn" id="btnSettings" title="设置">⚙</button>
+    <button class="iconbtn" id="btnLock" title="立即锁定">🔒</button>
   </div></div>
-  <div class="wrap">
-    <div id="grid" class="grid"></div>
+
+  <div class="wrap layout">
+    <div class="side">
+      <h4>视图</h4>
+      <div class="cat" data-view="normal"><span class="ic">📁</span><span class="nm">普通区</span></div>
+      <div class="cat" data-view="secret" id="secretTab"><span class="ic">🔒</span><span class="nm">绝密区</span></div>
+      <h4>分类</h4>
+      <div id="catList"></div>
+      <button class="addcat" id="btnAddCat">＋ 新建分类</button>
+      <h4>其他</h4>
+      <div class="cat" data-view="trash"><span class="ic">🗑</span><span class="nm">回收站</span></div>
+    </div>
+    <div class="main">
+      <div class="toolbar">
+        <button class="btn" id="btnAdd">＋ 新建条目</button>
+        <button class="btn ghost" id="btnTools">🧰 工具</button>
+      </div>
+      <div id="content"></div>
+    </div>
   </div>
 </div>
 
-<!-- 通用弹窗 -->
-<div id="modalBg" class="modal-bg hidden" onclick="if(event.target===this)closeModal()">
-  <div class="modal" id="modal"></div>
-</div>
 <div id="toast" class="toast"></div>
 
-<script src="/static/jsqr.js"></script>
-<script src="/static/qrcode.min.js"></script>
 <script>
-// ============================ 基础工具 ============================
-const $ = (id)=>document.getElementById(id);
-let TOKEN=null, LOGIN_PWD=null, VKEY=null, VAULT=null, META=null, PW={}, URL={};
-const b64=(u)=>btoa(String.fromCharCode(...new Uint8Array(u)));
-const unb64=(s)=>new Uint8Array(atob(s).split('').map(c=>c.charCodeAt(0)));
-async function sha256hex(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
-function genId(){return Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);}
-function now(){return Math.floor(Date.now()/1000);}
-function toast(m,t){const e=$('toast');e.textContent=m;e.className='toast show '+(t||'');setTimeout(()=>e.className='toast',1800);}
+"use strict";
+/* ============== 基础工具 ============== */
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const API_BASE=(localStorage.getItem('vlt_api_base')||'https://1256784020-5x5qs04wi9.ap-guangzhou.tencentscf.com').replace(/\/+$/,'');
-function full(path){return (API_BASE&&path.startsWith('/'))?API_BASE+path:path;}
+const enc=new TextEncoder(), dec=new TextDecoder();
+const b64u = a=>{const b=btoa(String.fromCharCode(...new Uint8Array(a)));return b.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
+const b64d = s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(s),c=>c.charCodeAt(0));};
+const b64 = a=>btoa(String.fromCharCode(...new Uint8Array(a)));
+const bytesB64 = b64;
+function toast(m,bad){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t.style.background=bad?'#e5484d':'#1c2330';t._t=setTimeout(()=>t.classList.remove('show'),2200);}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function uid(){return crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function rnd(n){return crypto.getRandomValues(new Uint8Array(n));}
+function genSalt(){return b64(rnd(16));}
+function now(){return Date.now();}
+function fmtDate(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}
+
+/* ============== 密码学（Web Crypto，零知识） ============== */
+async function sha256hex(str){const h=await crypto.subtle.digest('SHA-256',enc.encode(str));return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+async function deriveKey(password,saltB64){
+  const base=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:b64d(saltB64),iterations:150000,hash:'SHA-256'},
+    base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function importDEK(dekBytes){return crypto.subtle.importKey('raw',dekBytes,{name:'AES-GCM'},false,['encrypt','decrypt']);}
+async function wrapDEK(kek,dekBytes){const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},kek,dekBytes);return b64u(iv)+':'+b64u(ct);}
+async function unwrapDEK(kek,wrap){const[i,c]=wrap.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},kek,b64d(c));return new Uint8Array(pt);}
+async function encryptJSON(dekBytes,obj){const k=await importDEK(dekBytes);const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,enc.encode(JSON.stringify(obj)));return b64u(iv)+':'+b64u(ct);}
+async function decryptJSON(dekBytes,cipher){const k=await importDEK(dekBytes);const[i,c]=cipher.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},k,b64d(c));return JSON.parse(dec(new Uint8Array(pt)));}
+async function encryptBuf(dekBytes,buf){const k=await importDEK(dekBytes);const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,buf);return b64u(iv)+':'+b64u(ct);}
+async function decryptBuf(dekBytes,cipher){const k=await importDEK(dekBytes);const[i,c]=cipher.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},k,b64d(c));return pt;}
+
+/* ============== 状态 ============== */
+const SESSION_DAYS=7, ACCESS_MS=23*3600*1000;
+const state={
+  accessToken:null, accessExp:0, refreshToken:localStorage.getItem('vlt_refresh')||null,
+  view:'normal', activeCat:'__all__',
+  vaultKey:null,        // Uint8Array, 普通区 DEK（持久缓存 7 天）
+  vaultKeyExp:0,
+  secretKey:null,       // Uint8Array, 绝密区 DEK（仅本次会话内存）
+  auth:null,            // 来自登录的 auth 公开字段
+  data:null,            // 普通区明文
+  secret:null,          // 绝密区明文
+  needSetup:false,
+};
+
+/* ============== API ============== */
+async function ensureToken(){
+  if(state.accessToken && state.accessExp>Date.now()) return;
+  if(!state.refreshToken) throw{needLogin:true};
+  const r=await fetch(API_BASE+'/api/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refreshToken:state.refreshToken})});
+  const j=await r.json().catch(()=>({}));
+  if(j.code===0){state.accessToken=j.token;state.accessExp=Date.now()+ACCESS_MS;return;}
+  throw{needLogin:true};
+}
 async function api(path,opts={}){
-  const r=await fetch(full(path),{...opts,headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{}),...(opts.headers||{})}});
-  return r.json();
+  const secured=!['/api/login','/api/bootstrap','/api/refresh','/api/recover/verify','/api/recover/setnew','/api/health'].some(p=>path.startsWith(p))&&!/^\/api\/share\//.test(path);
+  if(secured){try{await ensureToken();}catch(e){if(e.needLogin)return{status:401,data:{code:1,msg:'需重新登录'}};throw e;}}
+  const headers={'Content-Type':'application/json'};
+  if(state.accessToken)headers['Authorization']='Bearer '+state.accessToken;
+  const r=await fetch(API_BASE+path,{method:opts.method||'GET',headers,body:opts.body?JSON.stringify(opts.body):undefined});
+  return{status:r.status,data:await r.json().catch(()=>({}))};
 }
-function openModal(html){$('modal').innerHTML=html;$('modalBg').classList.remove('hidden');}
-function closeModal(){$('modalBg').classList.add('hidden');}
-function openSettings(){
-  const cur=localStorage.getItem('vlt_api_base')||'https://1256784020-5x5qs04wi9.ap-guangzhou.tencentscf.com';
-  openModal(`<h3>设置 SCF API 地址</h3>
-    <div class="sub">前端托管在 CloudStudio / GitHub Pages（与 SCF 不同源），需填写 SCF（API 服务）的访问地址，例如：<br><code>https://vlt-mgr-xxxx.apigw.tencentcs.com/release</code></div>
-    <div class="field"><label>SCF API 地址</label><input id="f_api" value="${esc(cur)}" placeholder="https://xxx.ap-guangzhou.tencentscf.com"></div>
-    <div class="bar"><button class="btn-p" onclick="saveSettings()">保存</button><button class="btn-s" onclick="closeModal()">取消</button></div>`);
+async function binApi(path,method,body){
+  await ensureToken();
+  const r=await fetch(API_BASE+path,{method,headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/octet-stream'},body});
+  return{status:r.status,data:await r.json().catch(()=>({}))};
 }
-function saveSettings(){
-  const v=$('f_api').value.trim().replace(/\/+$/,'');
-  if(v)localStorage.setItem('vlt_api_base',v);else localStorage.removeItem('vlt_api_base');
-  location.reload();
+async function binGet(path){
+  await ensureToken();
+  const r=await fetch(API_BASE+path,{headers:{'Authorization':'Bearer '+state.accessToken}});
+  if(r.status!==200)throw{status:r.status};
+  return r.arrayBuffer();
 }
-function copy(t){navigator.clipboard.writeText(t).then(()=>toast('已复制','ok'),()=>toast(t,''));}
 
-// ============================ 客户端加解密（模型 A） ============================
-async function deriveKey(pwd,saltBuf,iter){
-  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pwd),'PBKDF2',false,['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt:saltBuf,iterations:iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-async function enc(key,s){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(s));return {iv:b64(iv),ct:b64(new Uint8Array(ct))};}
-async function dec(key,b){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(b.iv)},key,unb64(b.ct));return new TextDecoder().decode(pt);}
-async function decBytes(key,b){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(b.iv)},key,unb64(b.ct));return pt;}
-async function encBytes(key,buf){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,buf);return {iv:b64(iv),ct:b64(new Uint8Array(ct))};}
-async function saveVault(){
-  const blob=await enc(VKEY,JSON.stringify(VAULT));
-  const cipher=b64(JSON.stringify(blob));
-  const meta={salt:META.salt,iterations:META.iterations,verifier:META.verifier};
-  const r=await api('/api/vault',{method:'PUT',body:JSON.stringify({cipher,meta})});
-  return r.code===0;
-}
-function log(action,target){VAULT.log.unshift({ts:now(),action,target});if(VAULT.log.length>500)VAULT.log.length=500;}
+/* ============== 存取密文 ============== */
+async function loadVault(){const r=await api('/api/vault');if(r.data.code===0&&r.data.cipher)state.data=await decryptJSON(state.vaultKey,r.data.cipher);else state.data=newVault();}
+async function saveVault(){const c=await encryptJSON(state.vaultKey,state.data);await api('/api/vault',{method:'PUT',body:{cipher:c}});}
+async function loadSecret(){const r=await api('/api/secret');if(r.data.code===0&&r.data.cipher)state.secret=await decryptJSON(state.secretKey,r.data.cipher);else state.secret=newSecret();}
+async function saveSecret(){const c=await encryptJSON(state.secretKey,state.secret);await api('/api/secret',{method:'PUT',body:{cipher:c}});}
+function newVault(){return{categories:[],entries:[],trash:[],logs:[],settings:{clipboardClear:15,theme:'light'}};}
+function newSecret(){return{entries:[],logs:[]};}
 
-// ============================ 登录 / 解锁 ============================
-async function doLogin(){
-  const pwd=$('pw').value;
-  if(!API_BASE){toast('请先点下方⚙设置 SCF API 地址','err');openSettings();return;}
-  if(!pwd){toast('请输入密码','err');return;}
-  const pwHash=await sha256hex(pwd);
-  const r=await api('/api/login',{method:'POST',body:JSON.stringify({pwHash,totp:$('totp').value})});
-  if(r.code===0){TOKEN=r.token;LOGIN_PWD=pwd;if(r.totp_required)$('totpBox').classList.remove('hidden');await unlock();}
-  else if(r.code===2){$('totpBox').classList.remove('hidden');$('loginErr').textContent=r.msg;}
-  else {$('loginErr').textContent=r.msg;}
+/* ============== 登录态 / 解锁 ============== */
+function cacheSession(){
+  // 7 天免密：持久化 vaultKey + refreshToken
+  state.vaultKeyExp=now()+SESSION_DAYS*86400000;
+  localStorage.setItem('vlt_vaultkey',b64(state.vaultKey));
+  localStorage.setItem('vlt_vk_exp',String(state.vaultKeyExp));
+  localStorage.setItem('vlt_refresh',state.refreshToken);
 }
-async function unlock(){
-  const mr=await api('/api/meta');
-  let saltBuf,iter,verifier;
-  if(!mr.meta){
-    saltBuf=crypto.getRandomValues(new Uint8Array(16));iter=150000;
-    VKEY=await deriveKey(LOGIN_PWD,saltBuf,iter);
-    verifier=await enc(VKEY,'VAULT_OK');
-    META={salt:b64(saltBuf),iterations:iter,verifier};
-    VAULT={version:1,projects:[],log:[],trash:[]};
-    await saveVault();
-  }else{
-    META=mr.meta;saltBuf=unb64(mr.meta.salt);iter=mr.meta.iterations;
-    VKEY=await deriveKey(LOGIN_PWD,saltBuf,iter);
-    try{const ok=await dec(VKEY,mr.meta.verifier);if(ok!=='VAULT_OK')throw 0;}
-    catch(e){toast('密码错误','err');return;}
-    const vr=await api('/api/vault');
-    if(!vr.cipher){VAULT={version:1,projects:[],log:[],trash:[]};}
-    else{const blob=JSON.parse(atob(vr.cipher));VAULT=JSON.parse(await dec(VKEY,blob));}
+function isVkFresh(){const exp=+localStorage.getItem('vlt_vk_exp')||0;return exp>now()&&localStorage.getItem('vlt_vaultkey');}
+function clearSession(){state.vaultKey=state.secretKey=state.accessToken=null;state.accessExp=0;state.refreshToken=null;localStorage.removeItem('vlt_vaultkey');localStorage.removeItem('vlt_vk_exp');localStorage.removeItem('vlt_refresh');}
+
+async function tryAutoUnlock(){
+  if(!isVkFresh())return false;
+  try{await ensureToken();}catch(e){return false;}
+  state.vaultKey=b64d(localStorage.getItem('vlt_vaultkey'));
+  const r=await api('/api/auth');
+  if(r.data.code!==0)return false;
+  state.auth=r.data.auth;
+  await loadVault();
+  return true;
+}
+
+async function doLogin(pw,totp){
+  const pwHash=await sha256hex(pw);
+  const r=await api('/api/login',{method:'POST',body:{pwHash,totp}});
+  if(r.data.code===4){state.needSetup=true;return{needSetup:true};}
+  if(r.data.code!==0)return{err:r.data.msg,lock:r.data.lock,retry_after:r.data.retry_after};
+  state.accessToken=r.data.token;state.accessExp=now()+ACCESS_MS;state.refreshToken=r.data.refreshToken;state.totpRequired=r.data.totp_required;
+  state.auth=r.data.auth;
+  const kekM=await deriveKey(pw,state.auth.saltM);
+  state.vaultKey=await unwrapDEK(kekM,state.auth.wrapNormalByMaster);
+  cacheSession();
+  await loadVault();
+  return{ok:true};
+}
+async function doSetup(pw,secretPw,recoveryPw){
+  const loginHash=await sha256hex(pw);
+  const saltM=genSalt(),kekM=await deriveKey(pw,saltM);
+  const dekN=rnd(32);
+  const wrapNormalByMaster=await wrapDEK(kekM,dekN);
+  let extra={};
+  if(recoveryPw){
+    const saltR=genSalt(),kekR=await deriveKey(recoveryPw,saltR);
+    extra={saltR,wrapNormalByRecovery:await wrapDEK(kekR,dekN),recoveryHash:await sha256hex(recoveryPw),recoveryId:uid()};
   }
-  $('login').classList.add('hidden');$('app').classList.remove('hidden');
-  render();
+  let saltS=null,wrapSecretBySecret=null;
+  if(secretPw){saltS=genSalt();const kekS=await deriveKey(secretPw,saltS);const dekS=rnd(32);wrapSecretBySecret=await wrapDEK(kekS,dekS);}
+  const body={loginHash,saltM,wrapNormalByMaster,...extra};
+  if(saltS)body.saltS=saltS;if(wrapSecretBySecret)body.wrapSecretBySecret=wrapSecretBySecret;
+  const r=await api('/api/bootstrap',{method:'POST',body});
+  if(r.data.code!==0)return{err:r.data.msg};
+  state.accessToken=r.data.token;state.accessExp=now()+ACCESS_MS;state.refreshToken=r.data.refreshToken;
+  state.auth={saltM,...extra};if(saltS)state.auth.saltS=saltS;if(wrapSecretBySecret)state.auth.wrapSecretBySecret=wrapSecretBySecret;
+  state.vaultKey=dekN;cacheSession();
+  state.data=newVault();
+  return{ok:true};
 }
-function logout(){TOKEN=null;LOGIN_PWD=null;VKEY=null;VAULT=null;META=null;$('app').classList.add('hidden');$('login').classList.remove('hidden');$('pw').value='';$('totp').value='';}
+async function unlockSecret(secretPw){
+  if(!state.auth||!state.auth.saltS||!state.auth.wrapSecretBySecret)return{err:'未启用绝密区'};
+  const kekS=await deriveKey(secretPw,state.auth.saltS);
+  try{state.secretKey=await unwrapDEK(kekS,state.auth.wrapSecretBySecret);}
+  catch(e){return{err:'绝密密码错误'};}
+  await loadSecret();return{ok:true};
+}
 
-// ============================ 渲染 ============================
-function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+/* ============== 渲染 ============== */
+function curData(){return state.view==='secret'?state.secret:state.data;}
 function render(){
-  const q=($('search').value||'').toLowerCase();
-  let ps=(VAULT.projects||[]).filter(p=>{
+  $$('.cat[data-view]').forEach(c=>c.classList.toggle('active',c.dataset.view===state.view&&state.activeCat==='__all__'&&state.view!=='trash'));
+  if(state.view==='trash'){return renderTrash();}
+  if(state.view==='secret'){$('#secretTab').classList.add('active');}
+  // 分类列表
+  const cats=state.data.categories||[];
+  const counts={};;(state.data.entries||[]).concat(state.data.trash||[]).forEach(e=>{if(e.categoryId)counts[e.categoryId]=(counts[e.categoryId]||0)+1;});
+  let html='';
+  const allCnt=(state.data.entries||[]).length;
+  html+=catRow('__all__','📋','全部',allCnt);
+  cats.forEach(c=>html+=catRow(c.id,c.icon||'📁',c.name,counts[c.id]||0));
+  $('#catList').innerHTML=html;
+  $$('#catList .cat').forEach(c=>c.onclick=()=>{state.activeCat=c.dataset.cat;render();});
+  // 条目
+  const q=($('#search').value||'').toLowerCase();
+  let entries=(state.data.entries||[]).filter(e=>{
+    if(state.activeCat!=='__all__'&&e.categoryId!==state.activeCat)return false;
     if(!q)return true;
-    if((p.name+p.category+p.description).toLowerCase().includes(q))return true;
-    return (p.links||[]).some(l=>(l.label+l.url).toLowerCase().includes(q)||(l.users||[]).some(u=>(u.note+u.username).toLowerCase().includes(q)));
+    return [e.label,e.url,e.note,...(e.users||[]).flatMap(u=>[u.username,u.note])].join(' ').toLowerCase().includes(q);
   });
-  const totalLinks=VAULT.projects.reduce((a,p)=>a+(p.links||[]).length,0);
-  const totalUsers=VAULT.projects.reduce((a,p)=>a+(p.links||[]).reduce((b,l)=>b+(l.users||[]).length,0),0);
-  $('stat').textContent=`${VAULT.projects.length} 个工程 · ${totalLinks} 条链接 · ${totalUsers} 个账号`;
-  const grid=$('grid');grid.innerHTML='';
-  if(!ps.length){grid.innerHTML='<div class="muted">暂无匹配。点右上角「＋ 工程」添加。</div>';return;}
-  for(const p of ps){
-    const linksHtml=(p.links||[]).map(l=>{
-      const usersHtml=(l.users||[]).map(u=>{
-        PW[u.id]=u.password;URL[l.id]=l.url;
-        const id='pw_'+u.id;
-        return `<div class="up">
-          <span class="note">${esc(u.note||'账号')}</span>
-          ${u.username?`<span class="uname">(${esc(u.username)})</span>`:''}
-          <span class="pw" id="${id}">••••••••</span>
-          <button class="btn-s mini" onclick="revealPw('${u.id}','${id}')">👁</button>
-          <button class="btn-s mini" onclick="copyPW('${u.id}')">复制</button>
-          <button class="btn-d mini" onclick="delUser('${p.id}','${l.id}','${u.id}')">🗑</button>
-        </div>`;
-      }).join('');
-      const kindEmoji={link:'🔗',secret:'🔑',note:'📝'}[l.kind]||'🔗';
-      const imgsHtml=(l.images||[]).map(im=>`<button class="btn-s mini" onclick="viewImage('${p.id}','${l.id}','${im.id}')">🖼 ${esc(im.name||'图片')}</button>`).join('');
-      return `<div class="link">
-        <div class="link-name">${kindEmoji} ${esc(l.label||'链接')}
-          ${l.url?`<button class="btn-s mini" onclick="copyURL('${l.id}')">复制链接</button>
-          <button class="btn-s mini" onclick="showQR('${p.id}','${l.id}')">📱 二维码</button>`:''}
-          <button class="btn-s mini" onclick="openUser('${p.id}','${l.id}')">＋账号</button>
-          <button class="btn-s mini" onclick="openLink('${p.id}','${l.id}')">✎</button>
-          <button class="btn-d mini" onclick="delLink('${p.id}','${l.id}')">🗑</button>
-        </div>
-        <div class="url">${l.url?esc(l.url):'<span class="muted sm">（无链接）</span>'}</div>
-        ${usersHtml||'<div class="muted sm">无账号</div>'}
-        ${imgsHtml?`<div class="row">${imgsHtml}</div>`:''}
-      </div>`;
-    }).join('');
-    const card=document.createElement('div');card.className='card';
-    card.innerHTML=`<h3>${p.icon||'📁'} ${esc(p.name)} ${p.category?`<span class="badge">${esc(p.category)}</span>`:''}</h3>
-      <div class="desc">${esc(p.description||'')}</div>
-      ${linksHtml}
-      <div class="row">
-        <button class="btn-s mini" onclick="openLink('${p.id}',null)">＋链接</button>
-        <button class="btn-s mini" onclick="openProject('${p.id}')">✎ 编辑</button>
-        <button class="btn-d mini" onclick="delProject('${p.id}')">移至回收站</button>
-      </div>`;
-    grid.appendChild(card);
-  }
+  entries.sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
+  const box=$('#content');
+  if(!entries.length){box.innerHTML='<div class="empty">暂无条目。点「＋ 新建条目」开始。</div>';return;}
+  box.innerHTML='<div class="cards">'+entries.map(cardHTML).join('')+'</div>';
+  bindCards();
 }
-function revealPw(uid,eid){const e=$(eid);if(e.textContent==='••••••••'){e.textContent=PW[uid];}else{e.textContent='••••••••';}}
-function copyPW(uid){copy(PW[uid]);log('copy',uid);}
-function copyURL(lid){copy(URL[lid]);}
-function openURL(lid){const u=URL[lid];if(u)window.open(u,'_blank');}
-
-// ============================ CRUD：工程 ============================
-function getProject(id){return VAULT.projects.find(p=>p.id===id);}
-function openProject(id){
-  const p=id?getProject(id):null;
-  openModal(`<h3>${id?'编辑工程':'新建工程'}</h3>
-    <div class="field"><label>名称</label><input id="f_name" value="${esc(p?p.name:'')}"></div>
-    <div class="field"><label>图标 (emoji)</label><input id="f_icon" value="${esc(p?p.icon:'📁')}" maxlength="4"></div>
-    <div class="field"><label>分类</label><input id="f_cat" value="${esc(p?p.category:'')}" placeholder="如 知识库 / 学习工具"></div>
-    <div class="field"><label>简介</label><textarea id="f_desc" rows="3">${esc(p?p.description:'')}</textarea></div>
-    <div class="bar"><button class="btn-p" onclick="saveProject('${id||''}')">保存</button><button class="btn-s" onclick="closeModal()">取消</button></div>`);
+function catRow(id,ic,nm,ct){const act=state.activeCat===id?'active':'';return `<div class="cat ${act}" data-cat="${id}"><span class="ic">${ic}</span><span class="nm">${esc(nm)}</span><span class="ct">${ct}</span></div>`;}
+function cardHTML(e){
+  const tlabel={link:'链接',credential:'账号',note:'备忘'}[e.type]||'';
+  let users='';
+  (e.users||[]).forEach(u=>{users+=`<div class="user"><span class="un">${esc(u.note||u.username||'账号')}</span><span class="pw">${esc(u.username||'')}</span><button class="chip" data-copy="${(u.password||'').replace(/"/g,'&quot;')}">复制密码</button><button class="chip" data-copy="${(u.username||'').replace(/"/g,'&quot;')}">复制账号</button></div>`;});
+  let imgs='';
+  if(e.images&&e.images.length)imgs='<div class="imgrow">'+e.images.map(im=>`<img data-img="${im.id}" alt="${esc(im.name)}" />`).join('')+'</div>';
+  let qr='';
+  if(e.qrText)qr=`<button class="chip" data-qr="${esc(e.qrText)}">显示二维码</button>`;
+  let openBtn='';
+  if(e.url)openBtn=`<button class="chip" data-open="${esc(e.url)}">打开</button><button class="chip" data-copy="${(e.url||'').replace(/"/g,'&quot;')}">复制链接</button>`;
+  return `<div class="card ${e.pinned?'pin':''}" data-id="${e.id}">
+    <div class="hd"><span class="ttl">${esc(e.label||'(无标题)')}</span><span class="typ">${tlabel}</span></div>
+    ${e.url?`<div class="url">${esc(e.url)}</div>`:''}
+    ${e.note?`<div class="note">${esc(e.note)}</div>`:''}
+    ${users}${imgs}
+    <div class="acts">${openBtn}${qr}<button class="chip" data-edit="${e.id}">编辑</button><button class="chip" data-del="${e.id}">删除</button><button class="chip" data-pin="${e.id}">${e.pinned?'取消置顶':'置顶'}</button></div>
+  </div>`;
 }
-async function saveProject(id){
-  const name=$('f_name').value.trim();if(!name){toast('请填名称','err');return;}
-  if(id){const p=getProject(id);p.name=name;p.icon=$('f_icon').value||'📁';p.category=$('f_cat').value.trim();p.description=$('f_desc').value.trim();p.updatedAt=now();}
-  else{VAULT.projects.unshift({id:genId(),name,icon:$('f_icon').value||'📁',category:$('f_cat').value.trim(),description:$('f_desc').value.trim(),createdAt:now(),updatedAt:now(),links:[]});}
-  log('edit',name);await saveVault();closeModal();render();toast('已保存','ok');
+function bindCards(){
+  $$('.card').forEach(card=>{
+    const id=card.dataset.id;
+    card.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copyText(b.dataset.copy));
+    card.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>window.open(b.dataset.open,'_blank'));
+    card.querySelectorAll('[data-qr]').forEach(b=>b.onclick=()=>showQR(b.dataset.qr));
+    card.querySelectorAll('[data-img]').forEach(im=>im.onclick=()=>loadImg(im.dataset.img,im));
+    card.querySelector('[data-edit]')?.addEventListener('click',()=>openEditor(id));
+    card.querySelector('[data-del]')?.addEventListener('click',()=>delEntry(id));
+    card.querySelector('[data-pin]')?.addEventListener('click',()=>pinEntry(id));
+  });
 }
-async function delProject(id){
-  const p=getProject(id);
-  const allImgs=[];(p.links||[]).forEach(l=>(l.images||[]).forEach(im=>allImgs.push(im)));
-  if(allImgs.length)await cleanupImages(allImgs);
-  VAULT.trash.unshift({deletedAt:now(),project:p});VAULT.projects=VAULT.projects.filter(x=>x.id!==id);
-  await saveVault();render();toast('已移至回收站','ok');
+async function loadImg(id,el){
+  try{const bytes=await binGet('/api/file?id='+encodeURIComponent(id));const cipherStr=dec(new Uint8Array(bytes));const pt=await decryptBuf(state.vaultKey,cipherStr);const u=URL.createObjectURL(new Blob([pt]));el.src=u;}catch(e){toast('图片读取失败',true);}
+}
+function renderTrash(){
+  const box=$('#content');
+  const items=state.data.trash||[];
+  if(!items.length){box.innerHTML='<div class="empty">回收站为空。</div>';return;}
+  box.innerHTML='<div class="cards">'+items.map(e=>`<div class="card" data-id="${e.id}"><div class="hd"><span class="ttl">${esc(e.label||'(无标题)')}</span></div>${e.note?`<div class="note">${esc(e.note)}</div>`:''}<div class="acts"><button class="chip" data-res="${e.id}">恢复</button><button class="chip danger" data-purge="${e.id}">彻底删除</button></div></div>`).join('')+'</div>';
+  box.querySelectorAll('[data-res]').forEach(b=>b.onclick=()=>restoreEntry(b.dataset.res));
+  box.querySelectorAll('[data-purge]').forEach(b=>b.onclick=()=>purgeEntry(b.dataset.purge));
 }
 
-// ============================ CRUD：链接 ============================
-function getLink(pid,lid){const p=getProject(pid);return p?(p.links||[]).find(l=>l.id===lid):null;}
-function openLink(pid,lid){
-  const l=lid?getLink(pid,lid):null;
-  const kind=l?l.kind:'link';
-  const imgs=(l&&l.images)||[];
-  const imgHtml=imgs.map(im=>`<div class="up"><span class="note">${esc(im.name||'图片')}</span>
-     <button class="btn-s mini" onclick="viewImage('${pid}','${lid}','${im.id}')">查看</button>
-     <button class="btn-d mini" onclick="delImage('${pid}','${lid}','${im.id}')">🗑</button></div>`).join('');
-  openModal(`<h3>${lid?'编辑链接':'新建链接'}</h3>
-    <div class="field"><label>类型</label>
-      <select id="f_kind">
-        <option value="link"${kind==='link'?' selected':''}>🔗 链接（有网址，可扫二维码/生成二维码）</option>
-        <option value="secret"${kind==='secret'?' selected':''}>🔑 凭据（账号+密码，无网址）</option>
-        <option value="note"${kind==='note'?' selected':''}>📝 笔记</option>
-      </select></div>
-    <div class="field"><label>名称 / 角色</label><input id="f_label" value="${esc(l?l.label:'')}" placeholder="如 超管登录 / 统计页面 / 银行卡"></div>
-    <div class="field"><label>URL（网址 / 二维码内容，可为空）</label>
-      <div class="bar"><input id="f_url" value="${esc(l?l.url:'')}"><button class="btn-s" onclick="scanQR()">📷 扫二维码</button></div>
-    </div>
-    ${lid?`<div class="field"><label>图片（客户端加密上传，零知识）</label>
-       <button class="btn-s" onclick="uploadImage('${pid}','${lid}')">🖼 上传图片</button>
-       <div class="mt8">${imgHtml||'<span class="muted sm">暂无图片</span>'}</div></div>`:'<div class="muted sm mt8">保存后可上传图片</div>'}
-    <div class="bar"><button class="btn-p" onclick="saveLink('${pid}','${lid||''}')">保存</button><button class="btn-s" onclick="closeModal()">取消</button></div>`);
-}
-async function saveLink(pid,lid){
-  const label=$('f_label').value.trim();const url=$('f_url').value.trim();const kind=$('f_kind').value;
-  const p=getProject(pid);
-  if(lid){const l=getLink(pid,lid);l.label=label;l.url=url;l.kind=kind;}
-  else{p.links=p.links||[];p.links.push({id:genId(),label,url,kind,users:[],images:[]});}
-  log('edit',label);await saveVault();closeModal();render();toast('已保存','ok');
-}
-async function delLink(pid,lid){
-  const l=getLink(pid,lid);
-  if(l&&l.images&&l.images.length)await cleanupImages(l.images);
-  const p=getProject(pid);p.links=p.links.filter(x=>x.id!==lid);
-  await saveVault();render();toast('已删除链接','ok');
-}
+/* ============== 操作：增删改/日志 ============== */
+function logAction(action,entryId,detail){const arr=curData().logs;arr.push({ts:now(),action,entryId,detail});if(arr.length>500)arr.shift();}
+async function delEntry(id){if(!confirm('确定删除该条目？（可到回收站恢复）'))return;const arr=curData().entries;const i=arr.findIndex(e=>e.id===id);if(i<0)return;const[e]=arr.splice(i,1);curData().trash.push(e);logAction('delete',id);await saveCur();render();toast('已移到回收站');}
+async function restoreEntry(id){const t=curData().trash;const i=t.findIndex(e=>e.id===id);if(i<0)return;const[e]=t.splice(i,1);curData().entries.push(e);await saveCur();render();}
+async function purgeEntry(id){if(!confirm('彻底删除，不可恢复！'))return;const t=curData().trash;const i=t.findIndex(e=>e.id===id);if(i<0)return;t.splice(i,1);await saveCur();render();}
+async function pinEntry(id){const e=curData().entries.find(x=>x.id===id);if(!e)return;e.pinned=!e.pinned;e.updatedAt=now();await saveCur();render();}
+async function saveCur(){if(state.view==='secret')await saveSecret();else await saveVault();}
 
-// ============================ CRUD：账号-密码对 ============================
-function getUser(pid,lid,uid){const l=getLink(pid,lid);return l?(l.users||[]).find(u=>u.id===uid):null;}
-function openUser(pid,lid,uid){
-  const u=uid?getUser(pid,lid,uid):null;
-  openModal(`<h3>${uid?'编辑账号':'新增账号'}</h3>
-    <div class="field"><label>作用说明（该用户用途）</label><input id="f_note" value="${esc(u?u.note:'')}" placeholder="如 自己家庭 / 爸妈 / 亲戚临时"></div>
-    <div class="field"><label>用户名（可为空）</label><input id="f_uname" value="${esc(u?u.username:'')}"></div>
-    <div class="field"><label>密码</label>
-      <div class="bar"><input id="f_pwd" type="text" value="${esc(u?u.password:'')}"><button class="btn-s" onclick="genPwd()">🎲 生成</button></div>
-    </div>
-    <div class="bar"><button class="btn-p" onclick="saveUser('${pid}','${lid}','${uid||''}')">保存</button><button class="btn-s" onclick="closeModal()">取消</button></div>`);
-}
-function genPwd(){
-  const cs='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
-  let s='';for(let i=0;i<16;i++)s+=cs[Math.floor(Math.random()*cs.length)];
-  $('f_pwd').value=s;toast('已生成','ok');
-}
-async function saveUser(pid,lid,uid){
-  const note=$('f_note').value.trim();const username=$('f_uname').value.trim();const password=$('f_pwd').value;
-  const l=getLink(pid,lid);l.users=l.users||[];
-  if(uid){const u=getUser(pid,lid,uid);u.note=note;u.username=username;u.password=password;u.updatedAt=now();}
-  else{l.users.push({id:genId(),note,username,password,updatedAt:now()});}
-  log('edit',note||'账号');await saveVault();closeModal();render();toast('已保存','ok');
-}
-async function delUser(pid,lid,uid){const l=getLink(pid,lid);l.users=l.users.filter(u=>u.id!==uid);await saveVault();render();toast('已删除账号','ok');}
-
-// ============================ 二维码 / 图片 ============================
-function loadImage(file){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=URL.createObjectURL(file);});}
-function scanQR(){
-  const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
-  inp.onchange=async()=>{
-    const f=inp.files[0];if(!f)return;
-    try{
-      const im=await loadImage(f);
-      const cv=document.createElement('canvas');cv.width=im.width;cv.height=im.height;
-      const ctx=cv.getContext('2d');ctx.drawImage(im,0,0);
-      const d=ctx.getImageData(0,0,cv.width,cv.height);
-      const res=(typeof jsQR!=='undefined')?jsQR(d.data,cv.width,cv.height):null;
-      if(res&&res.data){$('f_url').value=res.data;toast('已识别二维码，已填入','ok');}
-      else{toast('未识别到二维码','err');}
-    }catch(e){toast('二维码解析失败','err');}
+/* ============== 编辑器 ============== */
+function openEditor(id){
+  const isNew=!id;
+  const e=isNew?{id:uid(),type:'link',label:'',url:'',note:'',users:[],images:[],qrText:'',pinned:false,createdAt:now(),updatedAt:now()}:JSON.parse(JSON.stringify(curData().entries.find(x=>x.id===id)||{}));
+  const cats=state.data.categories||[];
+  const catsOpt=cats.map(c=>`<option value="${c.id}" ${e.categoryId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')||'<option value="">（无分类）</option>';
+  const usersHTML=(e.users||[]).map((u,i)=>`<div class="userrow" data-i="${i}"><input placeholder="说明" value="${esc(u.note||'')}" data-f="note" style="flex:1"><input placeholder="账号" value="${esc(u.username||'')}" data-f="username"><input placeholder="密码" value="${esc(u.password||'')}" data-f="password"><button class="btn sm danger" data-deluser>×</button></div>`).join('');
+  const modal=overlay(`<div class="box"><h3>${isNew?'新建':'编辑'}条目</h3>
+    <div class="field"><label>类型</label><select id="f_type"><option value="link" ${e.type==='link'?'selected':''}>链接（含账号密码）</option><option value="credential" ${e.type==='credential'?'selected':''}>账号密码</option><option value="note" ${e.type==='note'?'selected':''}>纯文本备忘</option></select></div>
+    <div class="field"><label>标题</label><input id="f_label" value="${esc(e.label)}"></div>
+    <div class="field"><label>链接 URL</label><input id="f_url" value="${esc(e.url||'')}" placeholder="https://..."></div>
+    <div class="field"><label>分类</label><select id="f_cat">${catsOpt}</select></div>
+    <div class="field"><label>备注</label><textarea id="f_note" rows="3">${esc(e.note||'')}</textarea></div>
+    <div class="field"><label>二维码文本（解码后保存，展示时重生成）</label><input id="f_qr" value="${esc(e.qrText||'')}" placeholder="粘贴被扫码得到的文本"></div>
+    <div class="field"><label>账号 / 密码对</label><div id="users">${usersHTML}</div><button class="btn sm ghost" id="adduser">＋ 添加账号密码</button></div>
+    <div class="field"><label>图片（客户端加密上传）</label><input type="file" id="f_img" multiple accept="image/*"></div>
+    <div class="foot"><button class="btn ghost" id="cancel">取消</button><button class="btn" id="save">保存</button></div></div>`);
+  $('#adduser').onclick=()=>{const d=document.createElement('div');d.className='userrow';d.innerHTML='<input placeholder="说明" data-f="note" style="flex:1"><input placeholder="账号" data-f="username"><input placeholder="密码" data-f="password"><button class="btn sm danger" data-deluser>×</button>';$('#users').appendChild(d);bindUserRows();};
+  bindUserRows();
+  $('#save').onclick=async()=>{
+    e.type=$('#f_type').value;e.label=$('#f_label').value.trim();e.url=$('#f_url').value.trim();e.categoryId=$('#f_cat').value||null;e.note=$('#f_note').value.trim();e.qrText=$('#f_qr').value.trim();e.updatedAt=now();
+    e.users=$$('#users .userrow').map(r=>({id:uid(),note:r.querySelector('[data-f=note]').value,note:r.querySelector('[data-f=note]').value,username:r.querySelector('[data-f=username]').value,password:r.querySelector('[data-f=password]').value,updatedAt:now()}));
+    // 图片加密上传
+    const files=$('#f_img').files;
+    for(const f of files){const buf=await f.arrayBuffer();const ct=await encryptBuf(state.vaultKey,buf);const fid=uid();await binApi('/api/upload?id='+fid,'PUT',ct);e.images=e.images||[];e.images.push({id:fid,name:f.name,type:f.type});}
+    if(isNew)curData().entries.push(e);else{const arr=curData().entries;const i=arr.findIndex(x=>x.id===e.id);if(i>=0)arr[i]=e;}
+    logAction(isNew?'create':'update',e.id);
+    await saveCur();closeOverlay(modal);render();toast('已保存');
   };
-  inp.click();
+  $('#cancel').onclick=()=>closeOverlay(modal);
 }
-function showQR(pid,lid){
-  const l=getLink(pid,lid);if(!l||!l.url){toast('该链接没有 URL','err');return;}
-  openModal(`<h3>📱 二维码</h3>
-    <div id="qrbox" style="display:flex;justify-content:center;padding:8px"></div>
-    <div class="field mt12"><label>链接（可复制 / 打开）</label>
-      <div class="hash-out">${esc(l.url)}</div>
-      <div class="mt8"><button class="btn-s mini" onclick="copyURL('${l.id}')">复制链接</button>
-      <button class="btn-s mini" onclick="openURL('${l.id}')">打开</button></div>
-    </div>
-    <div class="bar mt12"><button class="btn-s" onclick="closeModal()">关闭</button></div>`);
-  const box=$('qrbox');
-  try{new QRCode(box,{text:l.url,width:200,height:200,correctLevel:QRCode.CorrectLevel.M});}
-  catch(e){box.textContent='二维码生成失败：'+(e.message||e);}
-}
-async function uploadImage(pid,lid){
-  const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
-  inp.onchange=async()=>{
-    const f=inp.files[0];if(!f)return;
-    try{
-      const buf=await f.arrayBuffer();
-      const enc=await encBytes(VKEY,buf);
-      const id=genId();
-      const r=await fetch(full('/api/upload?id='+id),{method:'PUT',headers:{Authorization:'Bearer '+TOKEN,'Content-Type':'application/octet-stream'},body:JSON.stringify(enc)});
-      const j=await r.json();
-      if(j.code!==0){toast('上传失败：'+(j.msg||''),'err');return;}
-      const l=getLink(pid,lid);l.images=l.images||[];l.images.push({id,name:f.name,type:f.type});
-      await saveVault();render();toast('图片已加密上传','ok');
-    }catch(e){toast('上传失败','err');}
-  };
-  inp.click();
-}
-async function viewImage(pid,lid,iid){
-  try{
-    const r=await fetch(full('/api/file?id='+iid),{headers:{Authorization:'Bearer '+TOKEN}});
-    if(!r.ok){toast('读取失败','err');return;}
-    const o=JSON.parse(await r.text());
-    const buf=await decBytes(VKEY,o);
-    const l=getLink(pid,lid);const im=(l.images||[]).find(x=>x.id===iid)||{};
-    const url=URL.createObjectURL(new Blob([buf],{type:im.type||'image/png'}));
-    openModal(`<h3>🖼 ${esc(im.name||'图片')}</h3>
-      <div style="text-align:center"><img src="${url}" style="max-width:100%;border-radius:10px"></div>
-      <div class="bar mt12"><button class="btn-d" onclick="delImage('${pid}','${lid}','${iid}')">🗑 删除</button><button class="btn-s" onclick="closeModal()">关闭</button></div>`);
-  }catch(e){toast('解密失败','err');}
-}
-async function delImage(pid,lid,iid){
-  await fetch(full('/api/file?id='+iid),{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}});
-  const l=getLink(pid,lid);l.images=(l.images||[]).filter(x=>x.id!==iid);
-  await saveVault();render();closeModal();toast('已删除图片','ok');
-}
-async function cleanupImages(items){
-  for(const im of items){try{await fetch(full('/api/file?id='+im.id),{method:'DELETE',headers:{Authorization:'Bearer '+TOKEN}});}catch(e){}}
-}
+function bindUserRows(){$('#users')?.querySelectorAll('[data-deluser]').forEach(b=>b.onclick=()=>b.closest('.userrow').remove());}
 
-// ============================ 自算密钥（SHA-256 hex，对齐其他工程） ============================
-function openSelf(){
-  openModal(`<h3>🧮 自算密钥</h3>
-    <div class="muted sm">输入明文 → 输出 SHA-256 小写 hex。可直接粘贴到任意工程的 SCF 环境变量（如 ADMIN_PWD / SUPER_ADMIN_KEY_HASH）。</div>
-    <div class="field mt12"><label>明文</label><input id="self_in" type="text" placeholder="输入要换算的密码 / 密钥" onkeydown="if(event.key==='Enter')selfRun()"></div>
-    <div class="field"><label>结果（密文 / hex）</label><div id="self_out" class="hash-out hidden"></div></div>
-    <div class="bar"><button class="btn-p" onclick="selfRun()">计算</button><button class="btn-s" onclick="closeModal()">关闭</button></div>`);
-}
-async function selfRun(){
-  const plain=$('self_in').value;if(!plain){toast('请输入明文','err');return;}
-  const hex=await sha256hex(plain);
-  const o=$('self_out');o.classList.remove('hidden');o.innerHTML=`${hex}<div class="mt8"><button class="btn-s mini" onclick="copy('${hex}')">复制密文</button></div>`;
-  toast('已生成 SHA-256 密文','ok');
-}
+/* ============== 分类 ============== */
+$('#btnAddCat').onclick=()=>{const modal=overlay(`<div class="box"><h3>新建分类</h3><div class="field"><label>名称</label><input id="cname"></div><div class="field"><label>图标 emoji</label><input id="cic" value="📁" maxlength="4"></div><div class="foot"><button class="btn ghost" id="cn">取消</button><button class="btn" id="cs">创建</button></div></div>`);
+  $('#cs').onclick=async()=>{const name=$('#cname').value.trim();if(!name)return;state.data.categories.push({id:uid(),name,icon:$('#cic').value||'📁',order:state.data.categories.length});await saveVault();closeOverlay(modal);render();};
+  $('#cn').onclick=()=>closeOverlay(modal);};
 
-// ============================ 导出 / 导入 ============================
+/* ============== 工具 / 设置 / 统计 / 分享 / 恢复 / 重置 ============== */
+$('#btnTools').onclick=()=>overlay(toolsHTML(),bindTools);
+$('#btnSettings').onclick=()=>overlay(settingsHTML(),bindSettings);
+$('#btnStats').onclick=()=>overlay(statsHTML(),bindStats);
+$('#btnShare').onclick=()=>overlay(shareHTML(),bindShare);
+$('#btnRecover').onclick=()=>overlay(recoverHTML(),bindRecover);
+$('#btnAdd').onclick=()=>openEditor(null);
+$('#btnLock').onclick=()=>{clearSession();location.reload();};
+$('#search').oninput=()=>render();
+$$('.cat[data-view]').forEach(c=>c.onclick=()=>{state.view=c.dataset.view;state.activeCat='__all__';if(c.dataset.view==='secret'&&!state.secretKey){openSecretGate();return;}render();});
+
+function toolsHTML(){return `<div class="box"><h3>🧰 工具</h3>
+  <div class="field"><label>自算密钥（明文 → SHA-256 hex，可贴 SCF 环境变量）</label><textarea id="t_in" rows="3" placeholder="输入要算的明文"></textarea><div class="row2" style="margin-top:6px"><button class="btn sm" id="t_calc">计算</button><button class="btn sm ghost" id="t_copy">复制结果</button></div><div id="t_out" style="margin-top:8px;word-break:break-all;font-family:ui-monospace,monospace"></div></div>
+  <div class="field"><label>随机密码生成器</label><div class="row2"><input id="r_len" type="number" value="16" min="6" max="64"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="r_sym" checked style="width:auto"> 符号</label></div><div class="row2" style="margin-top:6px"><button class="btn sm" id="r_gen">生成</button><button class="btn sm ghost" id="r_copy">复制</button></div><div id="r_out" style="margin-top:8px;font-family:ui-monospace,monospace;word-break:break-all"></div></div>
+  <div class="field"><label>导出加密备份（密文，安全）</label><button class="btn sm" id="t_export">下载备份 .json</button></div>
+  <div class="field"><label>导入加密备份</label><input type="file" id="t_import" accept=".json"></div>
+  <div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
+function bindTools(m){
+  $('#t_calc').onclick=async()=>{$('#t_out').textContent=await sha256hex($('#t_in').value);};
+  $('#t_copy').onclick=()=>copyText($('#t_out').textContent);
+  $('#r_gen').onclick=()=>{const len=+$('#r_len').value||16;const a='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';const s='!@#$%^&*()-_=+';const ch=a+(($('#r_sym').checked?s:''));let o='';const b=rnd(len);for(let i=0;i<len;i++)o+=ch[b[i]%ch.length];$('#r_out').textContent=o;};
+  $('#r_copy').onclick=()=>copyText($('#r_out').textContent);
+  $('#t_export').onclick=()=>exportBackup();
+  $('#t_import').onchange=async ev=>{if(ev.target.files[0])await importBackup(ev.target.files[0]);};
+  $('#close').onclick=()=>closeOverlay(m);
+}
 async function exportBackup(){
-  const blob=await enc(VKEY,JSON.stringify(VAULT));
-  const payload={salt:META.salt,iterations:META.iterations,verifier:META.verifier,cipher:b64(JSON.stringify(blob))};
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload)],{type:'application/json'}));
-  a.download='vault-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('已导出加密备份','ok');
+  const v=await api('/api/vault'),sec=await api('/api/secret');
+  const blob={exportedAt:now(),vault:v.data.cipher||null,secret:sec.data.cipher||null,auth:state.auth};
+  const u=URL.createObjectURL(new Blob([JSON.stringify(blob)],{type:'application/json'}));
+  const a=document.createElement('a');a.href=u;a.download='vault-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('已导出密文备份');
 }
-function importBackup(){
-  openModal(`<h3>⬆ 导入备份</h3><div class="muted sm">选择一个之前导出的加密备份文件，将覆盖当前保险库。</div>
-    <div class="field mt12"><input id="imp" type="file"></div>
-    <div class="bar"><button class="btn-p" onclick="doImport()">导入并覆盖</button><button class="btn-s" onclick="closeModal()">取消</button></div>`);
+async function importBackup(file){
+  if(!confirm('导入将用备份覆盖当前云端密文，且会刷新主密码哈希（备份时的密码）。继续？'))return;
+  const obj=JSON.parse(await file.text());
+  if(obj.vault)await api('/api/vault',{method:'PUT',body:{cipher:obj.vault}});
+  if(obj.secret)await api('/api/secret',{method:'PUT',body:{cipher:obj.secret}});
+  if(obj.auth)await api('/api/auth',{method:'PUT',body:obj.auth});
+  toast('导入完成，请重新登录');closeOverlay(document.querySelector('.modal'));clearSession();location.reload();
 }
-async function doImport(){
-  const f=$('imp').files[0];if(!f){toast('请选择文件','err');return;}
-  const txt=await f.text();const p=JSON.parse(txt);
-  META={salt:p.salt,iterations:p.iterations,verifier:p.verifier};
-  VKEY=await deriveKey(LOGIN_PWD,unb64(p.salt),p.iterations);
-  try{await dec(VKEY,p.verifier);}catch(e){toast('备份与当前密码不匹配','err');return;}
-  const blob=JSON.parse(atob(p.cipher));VAULT=JSON.parse(await dec(VKEY,blob));
-  await saveVault();closeModal();render();toast('导入成功','ok');
+function settingsHTML(){return `<div class="box"><h3>⚙ 设置</h3>
+  <div class="field"><label>SCF API 地址</label><input id="f_api" value="${API_BASE}"><div class="hint">默认已填你的地址，一般无需修改。</div></div>
+  <div class="field"><label>复制密码后自动清空剪贴板（秒，0=不清除）</label><input id="f_clr" type="number" value="${state.data.settings?.clipboardClear??15}"></div>
+  <div class="field"><label>主题</label><select id="f_theme"><option value="light">浅色</option><option value="dark">深色</option></select></div>
+  <div class="field"><label>修改主密码</label><button class="btn sm" id="chg">重新包装密文</button><div class="hint">仅用当前 + 新主密码，DEK 不变，秒级完成。</div></div>
+  <div class="field"><label>启用 / 修改绝密区密码</label><button class="btn sm" id="setsec">设置绝密密码</button></div>
+  <div class="field"><label>系统重置（清空全部数据）</label><button class="btn sm danger" id="dowipe">重置整个系统</button></div>
+  <div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
+function bindSettings(m){
+  $('#f_theme').value=localStorage.getItem('vlt_theme')||'light';
+  $('#chg').onclick=()=>changeMaster();
+  $('#setsec').onclick=()=>setSecret();
+  $('#dowipe').onclick=()=>doWipe();
+  $('#close').onclick=()=>closeOverlay(m);
+  $('#f_api').onchange=()=>{localStorage.setItem('vlt_api_base',$('#f_api').value.trim());toast('已保存，刷新后生效');};
+  $('#f_clr').onchange=()=>{state.data.settings=state.data.settings||{};state.data.settings.clipboardClear=+$('#f_clr').value||0;saveVault();};
+  $('#f_theme').onchange=()=>{applyTheme($('#f_theme').value);state.data.settings=state.data.settings||{};state.data.settings.theme=$('#f_theme').value;saveVault();};
+}
+async function changeMaster(){
+  const cur=prompt('输入当前主密码');if(!cur)return;const nh=await sha256hex(cur);
+  if(nh!==state.auth.loginHash){toast('当前密码错误',true);return;}
+  const np=prompt('输入新主密码');if(!np)return;const cnp=prompt('再次输入新主密码');if(np!==cnp){toast('两次不一致',true);return;}
+  const nSalt=genSalt(),kek=await deriveKey(np,nSalt);
+  const wrap=await wrapDEK(kek,state.vaultKey);
+  const r=await api('/api/auth',{method:'PUT',body:{loginHash:await sha256hex(np),saltM:nSalt,wrapNormalByMaster:wrap}});
+  if(r.data.code===0){state.auth.loginHash=await sha256hex(np);state.auth.saltM=nSalt;state.auth.wrapNormalByMaster=wrap;toast('主密码已更新');closeOverlay(document.querySelector('.modal'));}
+  else toast('失败：'+(r.data.msg||''),true);
+}
+async function setSecret(){
+  const sp=prompt('设置绝密区密码（忘记无法恢复）');if(!sp)return;const csp=prompt('再次输入');if(sp!==csp){toast('两次不一致',true);return;}
+  const saltS=genSalt(),kek=await deriveKey(sp,saltS);const dekS=rnd(32);const wrap=await wrapDEK(kek,dekS);
+  const r=await api('/api/auth',{method:'PUT',body:{saltS,wrapSecretBySecret:wrap}});
+  if(r.data.code===0){state.auth.saltS=saltS;state.auth.wrapSecretBySecret=wrap;toast('绝密区已启用');closeOverlay(document.querySelector('.modal'));}
+  else toast('失败',true);
+}
+async function doWipe(){
+  if(!confirm('将清空全部数据（普通区/绝密区/登录凭据/图片/分享），不可恢复！\n建议先导出备份。'))return;
+  const c=confirm('最后确认：在下方输入框输入 DELETE（区分大小写）才能执行。');if(!c)return;
+  const v=prompt('请输入 DELETE：');if(v!=='DELETE'){toast('未输入 DELETE，已取消',true);return;}
+  const r=await api('/api/reset',{method:'POST',body:{confirm:'DELETE'}});
+  if(r.data.code===0){toast('系统已重置');clearSession();location.reload();}else toast('失败：'+(r.data.msg||''),true);
+}
+function statsHTML(){return `<div class="box"><h3>📊 统计面板</h3><div id="statsBody">加载中…</div><div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
+async function bindStats(m){
+  const d=curData();const entries=d.entries||[];
+  const views=(d.logs||[]).filter(l=>l.action==='view').length;
+  const copies=(d.logs||[]).filter(l=>l.action==='copy').length;
+  const loginRes=await api('/api/logs');
+  const loginLog=loginRes.data.loginLog||[];
+  let html=`<div class="statgrid">
+    <div class="stat"><div class="n">${entries.length}</div><div class="l">当前条目</div></div>
+    <div class="stat"><div class="n">${(state.data.categories||[]).length}</div><div class="l">分类数</div></div>
+    <div class="stat"><div class="n">${state.view==='secret'?'—':(state.data.trash||[]).length}</div><div class="l">回收站</div></div>
+    <div class="stat"><div class="n">${views}</div><div class="l">查看次数</div></div>
+    <div class="stat"><div class="n">${copies}</div><div class="l">复制次数</div></div>
+    <div class="stat"><div class="n">${loginLog.length}</div><div class="l">登录记录</div></div></div>`;
+  html+='<h4>最近活跃</h4>';
+  const recent=(d.logs||[]).slice(-12).reverse();
+  html+=recent.length?recent.map(l=>`<div class="logline"><span class="t">${fmtDate(l.ts)}</span><span>${esc(l.action)} ${esc(l.detail||'')}</span></div>`).join(''):'<div class="hint">暂无</div>';
+  html+='<h4>登录 IP 记录</h4>';
+  html+=loginLog.length?loginLog.slice(-12).reverse().map(l=>`<div class="logline"><span class="t">${fmtDate(l.ts*1000)}</span><span>${esc(l.ip)}</span></div>`).join(''):'<div class="hint">暂无</div>';
+  $('#statsBody').innerHTML=html;$('#close').onclick=()=>closeOverlay(m);
+}
+function shareHTML(){return `<div class="box"><h3>🔗 只读分享</h3>
+  <div class="field"><label>选择要分享的条目</label><select id="s_entry"></select></div>
+  <div class="field"><label>有效期（小时，0=不限）</label><input id="s_exp" type="number" value="24" min="0"></div>
+  <div class="field"><button class="btn" id="s_make">生成分享链接</button></div>
+  <div id="s_out" class="hidden"><div class="field"><label>分享链接（密钥在 # 片段，仅持有链接者可读）</label><input id="s_link" readonly><button class="btn sm" id="s_copy">复制</button></div></div>
+  <div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
+async function bindShare(m){
+  const entries=curData().entries||[];
+  $('#s_entry').innerHTML=entries.map(e=>`<option value="${e.id}">${esc(e.label||'(无标题)')}</option>`).join('')||'<option>无条目</option>';
+  $('#s_make').onclick=async()=>{
+    const e=entries.find(x=>x.id===$('#s_entry').value);if(!e)return;
+    const shareDEK=rnd(32);                      // 一次性随机分享密钥（零知识：密钥只放 URL # 片段）
+    const cipher=await encryptJSON(shareDEK,e);
+    const exp=+$('#s_exp').value||0;const expiresAt=exp?now()+exp*3600000:0;
+    const r=await api('/api/share',{method:'POST',body:{entryId:e.id,cipher,expiresAt}});
+    if(r.data.code===0){const link=location.origin+location.pathname+'#/share/'+r.data.id+'/'+b64u(shareDEK);
+      $('#s_link').value=link;$('#s_out').classList.remove('hidden');toast('分享已生成');}
+    else toast('失败',true);
+  };
+  $('#s_copy').onclick=()=>copyText($('#s_link').value);
+  $('#close').onclick=()=>closeOverlay(m);
+}
+function recoverHTML(){return `<div class="box"><h3>🛟 应急恢复（数字遗产）</h3>
+  <div class="field"><label>设置恢复密码 R（拆分给多人保管，拼齐可解锁普通区）</label><button class="btn sm" id="r_set">设置/更新 R</button></div>
+  <div class="field"><label>公开恢复链接（无限期有效，R 是唯一门槛）</label><div id="r_linkbox" class="hidden"><input id="r_link" readonly><button class="btn sm" id="r_copy">复制</button></div><div id="r_linktip" class="hint">尚未设置 R。</div></div>
+  <div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
+async function bindRecover(m){
+  if(state.auth&&state.auth.recoveryId){$('#r_link').value=location.origin+location.pathname+'#/recover/'+state.auth.recoveryId;$('#r_linkbox').classList.remove('hidden');$('#r_linktip').classList.add('hidden');}
+  $('#r_set').onclick=async()=>{
+    const R=prompt('设置恢复密码 R（建议足够长，随后拆分给不同人）');if(!R)return;const cR=prompt('再次输入 R');if(R!==cR){toast('两次不一致',true);return;}
+    const saltR=genSalt(),kekR=await deriveKey(R,saltR);const wrap=await wrapDEK(kekR,state.vaultKey);
+    const r=await api('/api/auth',{method:'PUT',body:{saltR,wrapNormalByRecovery:wrap,recoveryHash:await sha256hex(R),recoveryId:state.auth.recoveryId||uid()}});
+    if(r.data.code===0){state.auth.saltR=saltR;state.auth.wrapNormalByRecovery=wrap;state.auth.recoveryHash=await sha256hex(R);state.auth.recoveryId=state.auth.recoveryId||uid();
+      $('#r_link').value=location.origin+location.pathname+'#/recover/'+state.auth.recoveryId;$('#r_linkbox').classList.remove('hidden');$('#r_linktip').classList.add('hidden');toast('恢复密码已设置');}
+    else toast('失败',true);
+  };
+  $('#r_copy').onclick=()=>copyText($('#r_link').value);
+  $('#close').onclick=()=>closeOverlay(m);
 }
 
-// ============================ 回收站 / 日志 ============================
-function openTrash(){
-  const items=(VAULT.trash||[]).map(t=>`<div class="up"><span class="note">${esc(t.project.name)}</span><span class="muted sm">${new Date(t.deletedAt*1000).toLocaleString()}</span>
-    <button class="btn-s mini" onclick="restore('${t.project.id}')">恢复</button><button class="btn-d mini" onclick="purge('${t.project.id}')">彻底删除</button></div>`).join('')||'<div class="muted">回收站为空</div>';
-  openModal(`<h3>🗑 回收站</h3>${items}<div class="bar mt12"><button class="btn-s" onclick="closeModal()">关闭</button></div>`);
+/* ============== 覆盖层 / 复制 / 二维码 ============== */
+function overlay(html){const d=document.createElement('div');d.className='modal';d.innerHTML=html;document.body.appendChild(d);return d;}
+function closeOverlay(d){d.remove();}
+function showQR(text){const m=overlay(`<div class="box"><h3>二维码</h3><div class="qrbox" id="qrc"></div><div class="hint" style="margin-top:8px;word-break:break-all">${esc(text)}</div><div class="foot"><button class="btn ghost" id="c">关闭</button></div></div>`);new QRCode($('#qrc'),{text,width:220,height:220});$('#c').onclick=()=>closeOverlay(m);}
+async function copyText(text){if(!text)return;try{await navigator.clipboard.writeText(text);}catch(e){const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();}
+  toast('已复制');logAction('copy');const sec=state.data.settings?.clipboardClear||0;if(sec>0)setTimeout(()=>{try{navigator.clipboard.writeText('');}catch(e){}},sec*1000);}
+
+/* ============== 登录门 ============== */
+function showLogin(err){
+  const g=$('#gate');g.className='lockwrap';
+  g.innerHTML=`<div class="lockcard"><div class="big">🔐</div><h2>工程账本</h2>
+    ${state.needSetup?'<p style="color:var(--muted)">首次使用，设置主密码</p>':'<p style="color:var(--muted)">输入主密码解锁</p>'}
+    ${err?`<p style="color:var(--danger)">${esc(err)}</p>`:''}
+    <div class="field"><input id="lp" type="password" placeholder="主密码"></div>
+    ${state.totpRequired?'<div class="field"><input id="lt" placeholder="动态码（可选）"></div>':''}
+    ${state.needSetup?`<div class="field"><input id="lp2" type="password" placeholder="确认主密码"></div>
+      <div class="field"><input id="lsp" type="password" placeholder="绝密区密码（可选，留空不启用）"></div>
+      <div class="field"><input id="lrp" type="password" placeholder="应急恢复密码 R（可选）"></div>`:''}
+    <button class="btn" id="lgo" style="width:100%">${state.needSetup?'初始化':'解锁'}</button>
+    ${err&&err.lock?'<p style="color:var(--warn);margin-top:10px">已被锁定，请稍后再试</p>':''}
+  </div>`;
+  $('#lgo').onclick=async()=>{
+    const pw=$('#lp').value;if(!pw)return;
+    if(state.needSetup){if(pw!==$('#lp2').value){toast('两次密码不一致',true);return;}const r=await doSetup(pw,$('#lsp').value,$('#lrp').value);if(r.ok){enterApp();}else toast(r.err||'失败',true);}
+    else{const r=await doLogin(pw,$('#lt')?.value||'');if(r.ok)enterApp();else if(r.needSetup){state.needSetup=true;showLogin();}else{showLogin(r.err);}}
+  };
 }
-async function restore(id){const i=VAULT.trash.findIndex(t=>t.project.id===id);if(i<0)return;VAULT.projects.unshift(VAULT.trash[i].project);VAULT.trash.splice(i,1);await saveVault();render();closeModal();openTrash();toast('已恢复','ok');}
-async function purge(id){VAULT.trash=VAULT.trash.filter(t=>t.project.id!==id);await saveVault();closeModal();openTrash();toast('已彻底删除','ok');}
-function openLog(){
-  const items=(VAULT.log||[]).slice(0,50).map(l=>`<div class="up"><span class="muted sm">${new Date(l.ts*1000).toLocaleString()}</span><span class="note">${esc(l.action)}</span><span>${esc(l.target||'')}</span>`).join('')||'<div class="muted">暂无记录</div>';
-  openModal(`<h3>📜 操作日志</h3>${items}<div class="bar mt12"><button class="btn-s" onclick="closeModal()">关闭</button></div>`);
+function openSecretGate(){
+  const m=overlay(`<div class="box"><h3>🔒 绝密区验证</h3><div class="field"><input id="sp" type="password" placeholder="绝密区密码"></div><div class="foot"><button class="btn ghost" id="c">取消</button><button class="btn" id="ok">解锁</button></div></div>`);
+  $('#ok').onclick=async()=>{const r=await unlockSecret($('#sp').value);if(r.ok){closeOverlay(m);render();toast('绝密区已解锁');}else toast(r.err||'失败',true);};
+  $('#c').onclick=()=>closeOverlay(m);
+}
+function enterApp(){$('#gate').className='hidden';$('#gate').innerHTML='';$('#app').classList.remove('hidden');applyTheme(localStorage.getItem('vlt_theme')||state.data.settings?.theme||'light');render();toast('已解锁');}
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('vlt_theme',t);}
+
+/* ============== 分享/恢复 独立页（URL hash） ============== */
+async function handleHashRoute(){
+  const h=location.hash;
+  if(h.startsWith('#/share/')){const id=h.slice(8);await showSharePage(id);return true;}
+  if(h.startsWith('#/recover/')){const id=h.slice(9);await showRecoverPage(id);return true;}
+  return false;
+}
+async function showSharePage(route){
+  const [sid,keyB64]=route.split('/');
+  document.getElementById('app').classList.add('hidden');
+  const g=$('#gate');g.className='lockwrap';
+  g.innerHTML=`<div class="lockcard"><div class="big">🔗</div><h2>只读分享</h2><div id="sb">读取中…</div></div>`;
+  if(!keyB64){g.querySelector('#sb').innerHTML='<p style="color:var(--danger)">链接缺少密钥片段，无法解密</p>';return;}
+  const r=await api('/api/share/'+encodeURIComponent(sid));
+  if(r.status!==200||r.data.code!==0){g.querySelector('#sb').innerHTML='<p style="color:var(--danger)">'+(r.data.msg||'读取失败')+'</p>';return;}
+  let obj;try{obj=await decryptJSON(b64d(keyB64),r.data.cipher);}catch(e){g.querySelector('#sb').innerHTML='<p style="color:var(--danger)">解密失败（密钥不匹配）</p>';return;}
+  const users=(obj.users||[]).map(u=>`<div class="user"><span class="un">${esc(u.note||u.username||'')}</span><span class="pw">${esc(u.username||'')}</span><span class="pw">${esc(u.password||'')}</span></div>`).join('');
+  g.querySelector('#sb').innerHTML=`<div style="text-align:left"><h3 style="margin:0 0 8px">${esc(obj.label||'(无标题)')}</h3>
+    ${obj.url?`<div class="note"><a href="${esc(obj.url)}" target="_blank" rel="noopener">${esc(obj.url)}</a></div>`:''}
+    ${obj.note?`<div class="note">${esc(obj.note)}</div>`:''}
+    ${users?`<div class="users">${users}</div>`:''}
+    ${obj.qrText?`<div class="hint" style="margin-top:8px;word-break:break-all">${esc(obj.qrText)}</div>`:''}
+    <p class="hint" style="margin-top:14px">此页为只读分享，不含你的主密码。</p></div>`;
+}
+async function showRecoverPage(id){
+  document.getElementById('app').classList.add('hidden');
+  const g=$('#gate');g.className='lockwrap';
+  g.innerHTML=`<div class="lockcard"><div class="big">🛟</div><h2>应急恢复</h2><p style="color:var(--muted)">输入恢复密码 R 解锁普通区</p><div class="field"><input id="rr" type="password" placeholder="恢复密码 R"></div><button class="btn" id="rgo">解锁并设新主密码</button><div id="rstep2" class="hidden"><hr><p>设置新主密码（将展示资产，绝密区仍锁死）</p><div class="field"><input id="rn1" type="password" placeholder="新主密码"></div><div class="field"><input id="rn2" type="password" placeholder="确认新主密码"></div><button class="btn" id="rset">完成恢复</button></div></div>`;
+  $('#rgo').onclick=async()=>{
+    const R=$('#rr').value;if(!R)return;
+    const v=await api('/api/recover/verify',{method:'POST',body:{recoveryId:id,R:await sha256hex(R)}});
+    if(v.data.code!==0){toast(v.data.msg||'失败',true);return;}
+    const kekR=await deriveKey(R,v.data.saltR);let dekN;try{dekN=await unwrapDEK(kekR,v.data.wrapNormalByRecovery);}catch(e){toast('恢复密码错误',true);return;}
+    state.vaultKey=dekN;$('#rstep2').classList.remove('hidden');
+    $('#rset').onclick=async()=>{
+      const a=$('#rn1').value,b=$('#rn2').value;if(a!==b){toast('两次不一致',true);return;}
+      const saltM=genSalt(),kekM=await deriveKey(a,saltM);const wrap=await wrapDEK(kekM,dekN);
+      const s=await api('/api/recover/setnew',{method:'POST',body:{recoveryId:id,R:await sha256hex(R),loginHash:await sha256hex(a),saltM,wrapNormalByMaster:wrap}});
+      if(s.data.code===0){g.innerHTML='<div class="lockcard"><div class="big">✅</div><h2>恢复完成</h2><p>新主密码已设置。请用新主密码登录查看资产。</p></div>';}
+      else toast('失败',true);
+    };
+  };
 }
 
-// ============================ 深色模式 ============================
-function toggleDark(){document.body.classList.toggle('dark');const d=document.body.classList.contains('dark');localStorage.setItem('vm_dark',d?'1':'0');$('darkBtn').textContent=d?'☀️':'🌙';}
-(function(){if(localStorage.getItem('vm_dark')==='1'){document.body.classList.add('dark');$('darkBtn').textContent='☀️';}})();
-</script>
-<script>
-  // PWA: register service worker for installable, offline-capable shell.
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW registration failed:', e));
-    });
-  }
+/* ============== 启动 ============== */
+(async function start(){
+  if(await handleHashRoute())return;
+  // 先探测初始化状态
+  try{const h=await api('/api/health');if(h.data){if(h.data.initialized===false)state.needSetup=true;state.totpRequired=h.data.totp;}}catch(e){}
+  const au=document.createElement('div');au.className='autounlock';au.textContent='正在自动解锁…';
+  const ok=await tryAutoUnlock();
+  if(ok){enterApp();return;}
+  showLogin();
+})();
 </script>
 </body>
 </html>

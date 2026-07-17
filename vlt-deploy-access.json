@@ -1,0 +1,18 @@
+{
+  "version": "2.0",
+  "statement": [
+    {
+      "effect": "allow",
+      "action": [
+        "scf:GetFunction",
+        "scf:ListTriggers",
+        "scf:UpdateFunctionCode",
+        "scf:UpdateFunctionConfiguration",
+        "scf:PublishVersion"
+      ],
+      "resource": [
+        "qcs::scf:ap-guangzhou:uin/100005778049:function/vlt-mgr/default/*"
+      ]
+    }
+  ]
+}

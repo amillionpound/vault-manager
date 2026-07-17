@@ -330,6 +330,32 @@ def bootstrap():
     return jsonify({'code': 0, 'token': token, 'refreshToken': refresh, 'totp_required': bool(ADMIN_TOTP_SECRET)})
 
 
+# ---------- 紧急重置：用环境 ADMIN_PWD 证明部署所有权后清库重来 ----------
+# 适用场景：用户忘记/不匹配 auth.json 密码、无法登录，又无有效恢复密码 R 时。
+# 安全性等价于 bootstrap（都需知道 ADMIN_PWD 自算密钥），且重置后仍需 ADMIN_PWD 才能重新引导，
+# 不会引入额外攻击面。
+@app.route('/api/force_reset', methods=['POST'])
+def force_reset():
+    if not ADMIN_PWD_HASH:
+        return jsonify({'code': 3, 'msg': 'SCF 未配置 ADMIN_PWD，无法重置（请在环境变量设置 ADMIN_PWD 自算密钥 hex）'}), 400
+    d = get_json()
+    pw = (d.get('pwHash') or '').strip().lower()
+    if pw != ADMIN_PWD_HASH:
+        return jsonify({'code': 1, 'msg': '管理员密码(ADMIN_PWD)错误'}), 403
+    # 清库：删除所有数据对象（普通区/绝密区/登录态/服务端状态/上传/分享）
+    for k in (AUTH_KEY, SYS_KEY, VAULT_KEY, SECRET_KEY):
+        try:
+            cos_delete(k)
+        except Exception:
+            pass
+    try:
+        delete_prefix(UPLOAD_PREFIX)
+        delete_prefix(SHARE_PREFIX)
+    except Exception:
+        pass
+    return jsonify({'code': 0, 'ok': True, 'need_setup': True})
+
+
 # ---------- 登录：SHA-256 比对 + 限流锁定 + IP 记录 + 双令牌 ----------
 @app.route('/api/login', methods=['POST'])
 def login():

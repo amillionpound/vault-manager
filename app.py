@@ -356,26 +356,6 @@ def force_reset():
     return jsonify({'code': 0, 'ok': True, 'need_setup': True})
 
 
-# ---------- [临时] 一次性清库通道：由 AI 代理在用户授权下代为清空，无需用户密码 ----------
-# 仅本次部署临时存在，令牌为一次性随机值，清库完成后该端点会被移除并重新部署干净版本。
-_DEV_WIPE_TOKEN = '43538973c227a855d6e823161f26237d18325fc2635d36ac'
-@app.route('/api/dev_wipe', methods=['POST'])
-def dev_wipe():
-    if request.headers.get('X-Wipe-Token', '') != _DEV_WIPE_TOKEN:
-        return jsonify({'code': 1, 'msg': 'forbidden'}), 403
-    for k in (AUTH_KEY, SYS_KEY, VAULT_KEY, SECRET_KEY):
-        try:
-            cos_delete(k)
-        except Exception:
-            pass
-    try:
-        delete_prefix(UPLOAD_PREFIX)
-        delete_prefix(SHARE_PREFIX)
-    except Exception:
-        pass
-    return jsonify({'code': 0, 'ok': True, 'need_setup': True, 'wiped': True})
-
-
 # ---------- 登录：SHA-256 比对 + 限流锁定 + IP 记录 + 双令牌 ----------
 @app.route('/api/login', methods=['POST'])
 def login():

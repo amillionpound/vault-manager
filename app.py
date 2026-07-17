@@ -270,6 +270,11 @@ def health():
     out = {'code': 0, 'ok': True, 'cos': bool(COS_BUCKET),
            'initialized': load_auth() is not None, 'totp': bool(ADMIN_TOTP_SECRET)}
     try:
+        cos_get('__probe_get__')
+        out['cos_get'] = 'ok_or_404'
+    except Exception as ex:
+        out['cos_get_err'] = str(ex)[:200]
+    try:
         cos_put('__probe__', b'1')
         cos_delete('__probe__')
         out['cos_write'] = True

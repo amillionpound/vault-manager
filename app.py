@@ -94,6 +94,9 @@ def _cos_req(method, key, data=None, ctype='application/json', extra_query=''):
     auth = cos_sign(method, uri)
     url = 'https://{host}{uri}?{auth}{extra}'.format(host=COS_HOST, uri=uri, auth=auth, extra=extra_query)
     headers = {'Host': COS_HOST, 'Content-Type': ctype}
+    if data is not None:
+        # 强制 Content-Length，避免 urllib 对带 body 的请求改用 chunked 被前置 nginx 拒（400）
+        headers['Content-Length'] = str(len(data))
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     return urllib.request.urlopen(req, timeout=10)
 

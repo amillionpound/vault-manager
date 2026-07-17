@@ -1,5 +1,5 @@
 // vault-manager PWA service worker — app-shell cache, network for API.
-const CACHE = 'vlt-pwa-v3';
+const CACHE = 'vlt-pwa-v4';
 const SHELL = [
   './',
   './index.html',
@@ -31,8 +31,19 @@ self.addEventListener('fetch', (e) => {
   if (url.pathname.includes('/api/') || url.hostname.includes('tencentscf.com')) {
     return; // fall through to default network fetch
   }
-  // Same-origin static assets: cache-first, then network, cache the result.
   if (url.origin === self.location.origin) {
+    // 导航(打开首页)：网络优先，失败回退缓存 —— 保证每次部署都能拿到最新文件
+    if (req.mode === 'navigate') {
+      e.respondWith(
+        fetch(req).then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+          return res;
+        }).catch(() => caches.match('./index.html'))
+      );
+      return;
+    }
+    // 其他静态资源：cache-first，然后网络并更新缓存
     e.respondWith(
       caches.match(req).then((hit) => {
         if (hit) return hit;

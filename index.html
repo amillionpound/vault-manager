@@ -569,7 +569,7 @@ async function bindRecover(m){
 }
 
 /* ============== 覆盖层 / 复制 / 二维码 ============== */
-function overlay(html){const d=document.createElement('div');d.className='modal';d.innerHTML=html;document.body.appendChild(d);return d;}
+function overlay(html,cb){const d=document.createElement('div');d.className='modal';d.innerHTML=html;document.body.appendChild(d);if(cb)cb(d);return d;}
 function closeOverlay(d){d.remove();}
 function showQR(text){const m=overlay(`<div class="box"><h3>二维码</h3><div class="qrbox" id="qrc"></div><div class="hint" style="margin-top:8px;word-break:break-all">${esc(text)}</div><div class="foot"><button class="btn ghost" id="c">关闭</button></div></div>`);new QRCode($('#qrc'),{text,width:220,height:220});$('#c').onclick=()=>closeOverlay(m);}
 async function copyText(text){if(!text)return;try{await navigator.clipboard.writeText(text);}catch(e){const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();}

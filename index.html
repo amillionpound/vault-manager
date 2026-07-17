@@ -429,13 +429,15 @@ function toolsHTML(){return `<div class="box"><h3>🧰 工具</h3>
   <div class="field"><label>导入加密备份</label><input type="file" id="t_import" accept=".json"></div>
   <div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
 function bindTools(m){
-  $('#t_calc').onclick=async()=>{$('#t_out').textContent=await sha256hex($('#t_in').value);};
-  $('#t_copy').onclick=()=>copyText($('#t_out').textContent);
-  $('#r_gen').onclick=()=>{const len=+$('#r_len').value||16;const a='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';const s='!@#$%^&*()-_=+';const ch=a+(($('#r_sym').checked?s:''));let o='';const b=rnd(len);for(let i=0;i<len;i++)o+=ch[b[i]%ch.length];$('#r_out').textContent=o;};
-  $('#r_copy').onclick=()=>copyText($('#r_out').textContent);
-  $('#t_export').onclick=()=>exportBackup();
-  $('#t_import').onchange=async ev=>{if(ev.target.files[0])await importBackup(ev.target.files[0]);};
   $('#close').onclick=()=>closeOverlay(m);
+  try{
+    $('#t_calc').onclick=async()=>{$('#t_out').textContent=await sha256hex($('#t_in').value);};
+    $('#t_copy').onclick=()=>copyText($('#t_out').textContent);
+    $('#r_gen').onclick=()=>{const len=+$('#r_len').value||16;const a='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';const s='!@#$%^&*()-_=+';const ch=a+(($('#r_sym').checked?s:''));let o='';const b=rnd(len);for(let i=0;i<len;i++)o+=ch[b[i]%ch.length];$('#r_out').textContent=o;};
+    $('#r_copy').onclick=()=>copyText($('#r_out').textContent);
+    $('#t_export').onclick=()=>exportBackup();
+    $('#t_import').onchange=async ev=>{if(ev.target.files[0])await importBackup(ev.target.files[0]);};
+  }catch(e){/* 面板仍可关闭 */}
 }
 async function exportBackup(){
   const v=await api('/api/vault'),sec=await api('/api/secret');
@@ -460,14 +462,16 @@ function settingsHTML(){return `<div class="box"><h3>⚙ 设置</h3>
   <div class="field"><label>系统重置（清空全部数据）</label><button class="btn sm danger" id="dowipe">重置整个系统</button></div>
   <div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
 function bindSettings(m){
-  $('#f_theme').value=localStorage.getItem('vlt_theme')||'light';
-  $('#chg').onclick=()=>changeMaster();
-  $('#setsec').onclick=()=>setSecret();
-  $('#dowipe').onclick=()=>doWipe();
   $('#close').onclick=()=>closeOverlay(m);
-  $('#f_api').onchange=()=>{localStorage.setItem('vlt_api_base',$('#f_api').value.trim());toast('已保存，刷新后生效');};
-  $('#f_clr').onchange=()=>{state.data.settings=state.data.settings||{};state.data.settings.clipboardClear=+$('#f_clr').value||0;saveVault();};
-  $('#f_theme').onchange=()=>{applyTheme($('#f_theme').value);state.data.settings=state.data.settings||{};state.data.settings.theme=$('#f_theme').value;saveVault();};
+  try{
+    $('#f_theme').value=localStorage.getItem('vlt_theme')||'light';
+    $('#chg').onclick=()=>changeMaster();
+    $('#setsec').onclick=()=>setSecret();
+    $('#dowipe').onclick=()=>doWipe();
+    $('#f_api').onchange=()=>{localStorage.setItem('vlt_api_base',$('#f_api').value.trim());toast('已保存，刷新后生效');};
+    $('#f_clr').onchange=()=>{state.data.settings=state.data.settings||{};state.data.settings.clipboardClear=+$('#f_clr').value||0;saveVault();};
+    $('#f_theme').onchange=()=>{applyTheme($('#f_theme').value);state.data.settings=state.data.settings||{};state.data.settings.theme=$('#f_theme').value;saveVault();};
+  }catch(e){/* 面板仍可关闭 */}
 }
 async function changeMaster(){
   const cur=prompt('输入当前主密码');if(!cur)return;const nh=await sha256hex(cur);
@@ -495,24 +499,30 @@ async function doWipe(){
 }
 function statsHTML(){return `<div class="box"><h3>📊 统计面板</h3><div id="statsBody">加载中…</div><div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
 async function bindStats(m){
-  const d=curData();const entries=d.entries||[];
-  const views=(d.logs||[]).filter(l=>l.action==='view').length;
-  const copies=(d.logs||[]).filter(l=>l.action==='copy').length;
-  const loginRes=await api('/api/logs');
-  const loginLog=loginRes.data.loginLog||[];
-  let html=`<div class="statgrid">
-    <div class="stat"><div class="n">${entries.length}</div><div class="l">当前条目</div></div>
-    <div class="stat"><div class="n">${(state.data.categories||[]).length}</div><div class="l">分类数</div></div>
-    <div class="stat"><div class="n">${state.view==='secret'?'—':(state.data.trash||[]).length}</div><div class="l">回收站</div></div>
-    <div class="stat"><div class="n">${views}</div><div class="l">查看次数</div></div>
-    <div class="stat"><div class="n">${copies}</div><div class="l">复制次数</div></div>
-    <div class="stat"><div class="n">${loginLog.length}</div><div class="l">登录记录</div></div></div>`;
-  html+='<h4>最近活跃</h4>';
-  const recent=(d.logs||[]).slice(-12).reverse();
-  html+=recent.length?recent.map(l=>`<div class="logline"><span class="t">${fmtDate(l.ts)}</span><span>${esc(l.action)} ${esc(l.detail||'')}</span></div>`).join(''):'<div class="hint">暂无</div>';
-  html+='<h4>登录 IP 记录</h4>';
-  html+=loginLog.length?loginLog.slice(-12).reverse().map(l=>`<div class="logline"><span class="t">${fmtDate(l.ts*1000)}</span><span>${esc(l.ip)}</span></div>`).join(''):'<div class="hint">暂无</div>';
-  $('#statsBody').innerHTML=html;$('#close').onclick=()=>closeOverlay(m);
+  // 先绑关闭按钮：确保无论后续是否出错都能关掉
+  $('#close').onclick=()=>closeOverlay(m);
+  try{
+    const d=curData();const entries=d.entries||[];
+    const views=(d.logs||[]).filter(l=>l.action==='view').length;
+    const copies=(d.logs||[]).filter(l=>l.action==='copy').length;
+    let loginLog=[];
+    try{const lr=await api('/api/logs');loginLog=lr.data.loginLog||[];}catch(e){/* 服务端日志取不到时跳过 */}
+    let html=`<div class="statgrid">
+      <div class="stat"><div class="n">${entries.length}</div><div class="l">当前条目</div></div>
+      <div class="stat"><div class="n">${(state.data.categories||[]).length}</div><div class="l">分类数</div></div>
+      <div class="stat"><div class="n">${state.view==='secret'?'—':(state.data.trash||[]).length}</div><div class="l">回收站</div></div>
+      <div class="stat"><div class="n">${views}</div><div class="l">查看次数</div></div>
+      <div class="stat"><div class="n">${copies}</div><div class="l">复制次数</div></div>
+      <div class="stat"><div class="n">${loginLog.length}</div><div class="l">登录记录</div></div></div>`;
+    html+='<h4>最近活跃</h4>';
+    const recent=(d.logs||[]).slice(-12).reverse();
+    html+=recent.length?recent.map(l=>`<div class="logline"><span class="t">${fmtDate(l.ts)}</span><span>${esc(l.action)} ${esc(l.detail||'')}</span></div>`).join(''):'<div class="hint">暂无</div>';
+    html+='<h4>登录 IP 记录</h4>';
+    html+=loginLog.length?loginLog.slice(-12).reverse().map(l=>`<div class="logline"><span class="t">${fmtDate(l.ts*1000)}</span><span>${esc(l.ip)}</span></div>`).join(''):'<div class="hint">暂无</div>';
+    $('#statsBody').innerHTML=html;
+  }catch(e){
+    $('#statsBody').innerHTML='<div class="hint" style="color:var(--danger)">加载失败</div>';
+  }
 }
 function shareHTML(){return `<div class="box"><h3>🔗 只读分享</h3>
   <div class="field"><label>选择要分享的条目</label><select id="s_entry"></select></div>
@@ -521,37 +531,41 @@ function shareHTML(){return `<div class="box"><h3>🔗 只读分享</h3>
   <div id="s_out" class="hidden"><div class="field"><label>分享链接（密钥在 # 片段，仅持有链接者可读）</label><input id="s_link" readonly><button class="btn sm" id="s_copy">复制</button></div></div>
   <div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
 async function bindShare(m){
-  const entries=curData().entries||[];
-  $('#s_entry').innerHTML=entries.map(e=>`<option value="${e.id}">${esc(e.label||'(无标题)')}</option>`).join('')||'<option>无条目</option>';
-  $('#s_make').onclick=async()=>{
-    const e=entries.find(x=>x.id===$('#s_entry').value);if(!e)return;
-    const shareDEK=rnd(32);                      // 一次性随机分享密钥（零知识：密钥只放 URL # 片段）
-    const cipher=await encryptJSON(shareDEK,e);
-    const exp=+$('#s_exp').value||0;const expiresAt=exp?now()+exp*3600000:0;
-    const r=await api('/api/share',{method:'POST',body:{entryId:e.id,cipher,expiresAt}});
-    if(r.data.code===0){const link=location.origin+location.pathname+'#/share/'+r.data.id+'/'+b64u(shareDEK);
-      $('#s_link').value=link;$('#s_out').classList.remove('hidden');toast('分享已生成');}
-    else toast('失败',true);
-  };
-  $('#s_copy').onclick=()=>copyText($('#s_link').value);
   $('#close').onclick=()=>closeOverlay(m);
+  try{
+    const entries=curData().entries||[];
+    $('#s_entry').innerHTML=entries.map(e=>`<option value="${e.id}">${esc(e.label||'(无标题)')}</option>`).join('')||'<option>无条目</option>';
+    $('#s_make').onclick=async()=>{
+      const e=entries.find(x=>x.id===$('#s_entry').value);if(!e)return;
+      const shareDEK=rnd(32);
+      const cipher=await encryptJSON(shareDEK,e);
+      const exp=+$('#s_exp').value||0;const expiresAt=exp?now()+exp*3600000:0;
+      const r=await api('/api/share',{method:'POST',body:{entryId:e.id,cipher,expiresAt}});
+      if(r.data.code===0){const link=location.origin+location.pathname+'#/share/'+r.data.id+'/'+b64u(shareDEK);
+        $('#s_link').value=link;$('#s_out').classList.remove('hidden');toast('分享已生成');}
+      else toast('失败',true);
+    };
+    $('#s_copy').onclick=()=>copyText($('#s_link').value);
+  }catch(e){/* 面板仍可关闭 */}
 }
 function recoverHTML(){return `<div class="box"><h3>🛟 应急恢复（数字遗产）</h3>
   <div class="field"><label>设置恢复密码 R（拆分给多人保管，拼齐可解锁普通区）</label><button class="btn sm" id="r_set">设置/更新 R</button></div>
   <div class="field"><label>公开恢复链接（无限期有效，R 是唯一门槛）</label><div id="r_linkbox" class="hidden"><input id="r_link" readonly><button class="btn sm" id="r_copy">复制</button></div><div id="r_linktip" class="hint">尚未设置 R。</div></div>
   <div class="foot"><button class="btn ghost" id="close">关闭</button></div></div>`;}
 async function bindRecover(m){
-  if(state.auth&&state.auth.recoveryId){$('#r_link').value=location.origin+location.pathname+'#/recover/'+state.auth.recoveryId;$('#r_linkbox').classList.remove('hidden');$('#r_linktip').classList.add('hidden');}
-  $('#r_set').onclick=async()=>{
-    const R=prompt('设置恢复密码 R（建议足够长，随后拆分给不同人）');if(!R)return;const cR=prompt('再次输入 R');if(R!==cR){toast('两次不一致',true);return;}
-    const saltR=genSalt(),kekR=await deriveKey(R,saltR);const wrap=await wrapDEK(kekR,state.vaultKey);
-    const r=await api('/api/auth',{method:'PUT',body:{saltR,wrapNormalByRecovery:wrap,recoveryHash:await sha256hex(R),recoveryId:state.auth.recoveryId||uid()}});
-    if(r.data.code===0){state.auth.saltR=saltR;state.auth.wrapNormalByRecovery=wrap;state.auth.recoveryHash=await sha256hex(R);state.auth.recoveryId=state.auth.recoveryId||uid();
-      $('#r_link').value=location.origin+location.pathname+'#/recover/'+state.auth.recoveryId;$('#r_linkbox').classList.remove('hidden');$('#r_linktip').classList.add('hidden');toast('恢复密码已设置');}
-    else toast('失败',true);
-  };
-  $('#r_copy').onclick=()=>copyText($('#r_link').value);
   $('#close').onclick=()=>closeOverlay(m);
+  try{
+    if(state.auth&&state.auth.recoveryId){$('#r_link').value=location.origin+location.pathname+'#/recover/'+state.auth.recoveryId;$('#r_linkbox').classList.remove('hidden');$('#r_linktip').classList.add('hidden');}
+    $('#r_set').onclick=async()=>{
+      const R=prompt('设置恢复密码 R（建议足够长，随后拆分给不同人）');if(!R)return;const cR=prompt('再次输入 R');if(R!==cR){toast('两次不一致',true);return;}
+      const saltR=genSalt(),kekR=await deriveKey(R,saltR);const wrap=await wrapDEK(kekR,state.vaultKey);
+      const r=await api('/api/auth',{method:'PUT',body:{saltR,wrapNormalByRecovery:wrap,recoveryHash:await sha256hex(R),recoveryId:state.auth.recoveryId||uid()}});
+      if(r.data.code===0){state.auth.saltR=saltR;state.auth.wrapNormalByRecovery=wrap;state.auth.recoveryHash=await sha256hex(R);state.auth.recoveryId=state.auth.recoveryId||uid();
+        $('#r_link').value=location.origin+location.pathname+'#/recover/'+state.auth.recoveryId;$('#r_linkbox').classList.remove('hidden');$('#r_linktip').classList.add('hidden');toast('恢复密码已设置');}
+      else toast('失败',true);
+    };
+    $('#r_copy').onclick=()=>copyText($('#r_link').value);
+  }catch(e){/* 面板仍可关闭 */}
 }
 
 /* ============== 覆盖层 / 复制 / 二维码 ============== */

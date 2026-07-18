@@ -182,7 +182,7 @@ async function importDEK(dekBytes){return crypto.subtle.importKey('raw',dekBytes
 async function wrapDEK(kek,dekBytes){const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},kek,dekBytes);return b64u(iv)+':'+b64u(ct);}
 async function unwrapDEK(kek,wrap){const[i,c]=wrap.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},kek,b64d(c));return new Uint8Array(pt);}
 async function encryptJSON(dekBytes,obj){const k=await importDEK(dekBytes);const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,enc.encode(JSON.stringify(obj)));return b64u(iv)+':'+b64u(ct);}
-async function decryptJSON(dekBytes,cipher){if(!cipher||typeof cipher!=='string'||cipher.indexOf(':')<0)throw new Error('密文格式无效');const k=await importDEK(dekBytes);const[i,c]=cipher.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},k,b64d(c));return JSON.parse(dec(new Uint8Array(pt)));}
+async function decryptJSON(dekBytes,cipher){if(!cipher||typeof cipher!=='string'||cipher.indexOf(':')<0)throw new Error('密文格式无效');const k=await importDEK(dekBytes);const[i,c]=cipher.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},k,b64d(c));return JSON.parse(dec.decode(new Uint8Array(pt)));}
 async function encryptBuf(dekBytes,buf){const k=await importDEK(dekBytes);const iv=rnd(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,buf);return b64u(iv)+':'+b64u(ct);}
 async function decryptBuf(dekBytes,cipher){const k=await importDEK(dekBytes);const[i,c]=cipher.split(':');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(i)},k,b64d(c));return pt;}
 
@@ -237,9 +237,9 @@ async function binGet(path){
 
 /* ============== 存取密文 ============== */
 async function loadVault(){const r=await api('/api/vault');if(r.data.code===0&&r.data.cipher){try{state.data=await decryptJSON(state.vaultKey,r.data.cipher);}catch(e){state.data=newVault();toast('无法解密原有数据（密钥已变更），已显示空白，可通过「设置→导入加密备份」恢复',true);}}else state.data=newVault();}
-async function saveVault(){const c=await encryptJSON(state.vaultKey,state.data);await api('/api/vault',{method:'PUT',body:{cipher:c}});}
+async function saveVault(){const c=await encryptJSON(state.vaultKey,state.data);const r=await api('/api/vault',{method:'PUT',body:{cipher:c}});if(r.data.code!==0)throw new Error(r.data.msg||('保存失败('+(r.status||r.data.code)+')'));return r;}
 async function loadSecret(){const r=await api('/api/secret');if(r.data.code===0&&r.data.cipher){try{state.secret=await decryptJSON(state.secretKey,r.data.cipher);}catch(e){state.secret=newSecret();toast('绝密区数据无法解密（密钥不匹配），已显示空白，可用「设置→导入加密备份」恢复',true);}}else state.secret=newSecret();}
-async function saveSecret(){const c=await encryptJSON(state.secretKey,state.secret);await api('/api/secret',{method:'PUT',body:{cipher:c}});}
+async function saveSecret(){const c=await encryptJSON(state.secretKey,state.secret);const r=await api('/api/secret',{method:'PUT',body:{cipher:c}});if(r.data.code!==0)throw new Error(r.data.msg||('保存失败('+(r.status||r.data.code)+')'));return r;}
 function newVault(){return{categories:[],entries:[],trash:[],logs:[],settings:{clipboardClear:15,theme:'light'}};}
 function newSecret(){return{entries:[],trash:[],logs:[]};}
 
@@ -427,7 +427,7 @@ function bindCards(){
   });
 }
 async function loadImg(id,el){
-  try{const bytes=await binGet('/api/file?id='+encodeURIComponent(id));const cipherStr=dec(new Uint8Array(bytes));const pt=await decryptBuf(state.vaultKey,cipherStr);const u=URL.createObjectURL(new Blob([pt]));el.src=u;}catch(e){toast('图片读取失败',true);}
+  try{const bytes=await binGet('/api/file?id='+encodeURIComponent(id));const cipherStr=dec.decode(new Uint8Array(bytes));const pt=await decryptBuf(state.vaultKey,cipherStr);const u=URL.createObjectURL(new Blob([pt]));el.src=u;}catch(e){toast('图片读取失败',true);}
 }
 function renderTrash(){
   const box=$('#content');
@@ -446,10 +446,35 @@ async function purgeEntry(id){if(!confirm('彻底删除，不可恢复！'))retu
 async function pinEntry(id){const e=curData().entries.find(x=>x.id===id);if(!e)return;e.pinned=!e.pinned;e.updatedAt=now();await saveCur();render();}
 async function saveCur(){if(state.view==='secret')await saveSecret();else await saveVault();}
 
+/* ============== 编辑器草稿（本机自动保存，防退出丢失） ============== */
+function draftKey(){return 'vlt_draft_'+(state.view==='secret'?'secret':'normal');}
+async function saveDraft(obj){try{const c=await encryptJSON(state.vaultKey,obj);localStorage.setItem(draftKey(),c);}catch(e){}}
+async function loadDraft(){try{const c=localStorage.getItem(draftKey());if(!c)return null;return await decryptJSON(state.vaultKey,c);}catch(e){return null;}}
+function clearDraft(){localStorage.removeItem(draftKey());}
+function captureDraft(){
+  return{type:$('#f_type')?.value,label:$('#f_label')?.value||'',url:$('#f_url')?.value||'',
+    categoryId:(state.view==='secret')?null:($('#f_cat')?($('#f_cat').value||null):null),
+    note:$('#f_note')?.value||'',qrText:$('#f_qr')?.value||'',
+    users:$$('#users .userrow').map(r=>({note:r.querySelector('[data-f=note]')?.value||'',username:r.querySelector('[data-f=username]')?.value||'',password:r.querySelector('[data-f=password]')?.value||''})),
+    ts:now()};
+}
+let draftTimer=null;
+let suppressDraftFlush=false; // 保存成功后关闭编辑器时，不要再把草稿写回
+function scheduleDraft(){
+  if(!document.getElementById('f_label')){clearTimeout(draftTimer);return;} // 编辑器已关闭则不再排程（避免关闭后 blur 事件把空草稿覆盖上去）
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(async()=>{
+    if(!document.getElementById('f_label'))return; // 双保险：回调触发时编辑器已不在，则跳过
+    try{await saveDraft(captureDraft());}catch(e){}
+  },400);
+}
+
 /* ============== 编辑器 ============== */
-function openEditor(id){
+async function openEditor(id){
   const isNew=!id;
   const e=isNew?{id:uid(),type:'link',label:'',url:'',note:'',users:[],images:[],qrText:'',pinned:false,createdAt:now(),updatedAt:now()}:JSON.parse(JSON.stringify(curData().entries.find(x=>x.id===id)||{}));
+  const draft=await loadDraft();
+  if(draft){e.type=draft.type||e.type;e.label=draft.label||e.label;e.url=draft.url||e.url;e.categoryId=(draft.categoryId!=null)?draft.categoryId:e.categoryId;e.note=draft.note||e.note;e.qrText=draft.qrText||e.qrText;e.users=draft.users||e.users;}
   const inSecret=(state.view==='secret');
   const cats=inSecret?[]:(state.data.categories||[]);
   const catsOpt=cats.map(c=>`<option value="${c.id}" ${e.categoryId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')||'<option value="">（无分类）</option>';
@@ -466,19 +491,29 @@ function openEditor(id){
     <div class="foot"><button class="btn ghost" id="cancel">取消</button><button class="btn" id="save">保存</button></div></div>`);
   $('#adduser').onclick=()=>{const d=document.createElement('div');d.className='userrow';d.innerHTML='<input placeholder="说明" data-f="note" style="flex:1"><input placeholder="账号" data-f="username"><input placeholder="密码" data-f="password"><button class="btn sm danger" data-deluser>×</button>';$('#users').appendChild(d);bindUserRows();};
   bindUserRows();
+  // 草稿自动保存（输入即存本机，退出/切后台不丢）
+  ['f_type','f_label','f_url','f_cat','f_note','f_qr'].forEach(id=>{const el=$('#'+id);if(el){el.addEventListener('input',scheduleDraft);el.addEventListener('change',scheduleDraft);}});
+  if(draft)toast('已恢复上次未保存的草稿',false);
   $('#save').onclick=async()=>{
-    e.type=$('#f_type').value;e.label=$('#f_label').value.trim();e.url=$('#f_url').value.trim();e.categoryId=inSecret?null:($('#f_cat')?($('#f_cat').value||null):null);e.note=$('#f_note').value.trim();e.qrText=$('#f_qr').value.trim();e.updatedAt=now();
-    e.users=$$('#users .userrow').map(r=>({id:uid(),note:r.querySelector('[data-f=note]').value,note:r.querySelector('[data-f=note]').value,username:r.querySelector('[data-f=username]').value,password:r.querySelector('[data-f=password]').value,updatedAt:now()}));
-    // 图片加密上传
-    const files=$('#f_img').files;
-    for(const f of files){const buf=await f.arrayBuffer();const ct=await encryptBuf(state.vaultKey,buf);const fid=uid();await binApi('/api/upload?id='+fid,'PUT',ct);e.images=e.images||[];e.images.push({id:fid,name:f.name,type:f.type});}
-    if(isNew)curData().entries.push(e);else{const arr=curData().entries;const i=arr.findIndex(x=>x.id===e.id);if(i>=0)arr[i]=e;}
-    logAction(isNew?'create':'update',e.id);
-    await saveCur();closeOverlay(modal);render();toast('已保存');
+    try{
+      e.type=$('#f_type').value;e.label=$('#f_label').value.trim();e.url=$('#f_url').value.trim();e.categoryId=inSecret?null:($('#f_cat')?($('#f_cat').value||null):null);e.note=$('#f_note').value.trim();e.qrText=$('#f_qr').value.trim();e.updatedAt=now();
+      e.users=$$('#users .userrow').map(r=>({id:uid(),note:r.querySelector('[data-f=note]').value,note:r.querySelector('[data-f=note]').value,username:r.querySelector('[data-f=username]').value,password:r.querySelector('[data-f=password]').value,updatedAt:now()}));
+      // 图片加密上传
+      const files=$('#f_img').files;
+      for(const f of files){const buf=await f.arrayBuffer();const ct=await encryptBuf(state.vaultKey,buf);const fid=uid();await binApi('/api/upload?id='+fid,'PUT',ct);e.images=e.images||[];e.images.push({id:fid,name:f.name,type:f.type});}
+      if(isNew)curData().entries.push(e);else{const arr=curData().entries;const i=arr.findIndex(x=>x.id===e.id);if(i>=0)arr[i]=e;}
+      logAction(isNew?'create':'update',e.id);
+      await saveCur();
+      clearDraft();
+      suppressDraftFlush=true; // 已保存成功，关闭时不要再把草稿重新写回
+      closeOverlay(modal);render();toast('已保存');
+    }catch(err){
+      toast('保存失败：'+(err&&err.message||err)+'（内容已自动存为本机草稿，可重试保存）',true);
+    }
   };
   $('#cancel').onclick=()=>closeOverlay(modal);
 }
-function bindUserRows(){$('#users')?.querySelectorAll('[data-deluser]').forEach(b=>b.onclick=()=>b.closest('.userrow').remove());}
+function bindUserRows(){$('#users')?.querySelectorAll('.userrow').forEach(r=>{r.querySelectorAll('input').forEach(inp=>{inp.addEventListener('input',scheduleDraft);});r.querySelector('[data-deluser]')?.addEventListener('click',()=>r.remove());});}
 
 /* ============== 分类 ============== */
 $('#btnAddCat').onclick=()=>{const modal=overlay(`<div class="box"><h3>新建分类</h3><div class="field"><label>名称</label><input id="cname"></div><div class="field"><label>图标 emoji</label><input id="cic" value="📁" maxlength="4"></div><div class="foot"><button class="btn ghost" id="cn">取消</button><button class="btn" id="cs">创建</button></div></div>`);
@@ -497,8 +532,9 @@ $('#search').oninput=()=>render();
 $$('.cat[data-view]').forEach(c=>c.onclick=()=>{state.view=c.dataset.view;state.activeCat='__all__';closeDrawer();if(c.dataset.view==='secret'&&!state.secretKey){openSecretGate();return;}render();});
 
 /* ============== 移动端抽屉 / PWA 安装 ============== */
-function closeDrawer(){$('#side')?.classList.remove('open');$('#backdrop')?.classList.remove('show');}
-$('#btnMenu').onclick=()=>{$('#side').classList.toggle('open');$('#backdrop').classList.toggle('show');};
+function closeDrawer(){$('#side')?.classList.remove('open');$('#backdrop')?.classList.remove('show');if(uiLayers>0)uiLayers--;}
+function closeDrawerNoCount(){$('#side')?.classList.remove('open');$('#backdrop')?.classList.remove('show');}
+$('#btnMenu').onclick=()=>{const willOpen=!$('#side').classList.contains('open');$('#side').classList.toggle('open');$('#backdrop').classList.toggle('show');if(willOpen)openUILayer();else if(uiLayers>0)uiLayers--;};
 $('#backdrop').onclick=closeDrawer;
 // iOS 引导：未安装到主屏时显示提示条
 const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
@@ -671,8 +707,33 @@ async function bindRecover(m){
 }
 
 /* ============== 覆盖层 / 复制 / 二维码 ============== */
-function overlay(html,cb){const d=document.createElement('div');d.className='modal';d.innerHTML=html;document.body.appendChild(d);if(cb)cb(d);return d;}
-function closeOverlay(d){d.remove();}
+/* UI 层栈：打开 modal/drawer 时 +1，关闭时 -1；配合 history.pushState 拦截安卓系统返回键，避免直接退出 PWA 丢数据 */
+let uiLayers=0;
+function openUILayer(){uiLayers++;history.pushState({u:uiLayers},'');}
+function popUILayer(){if(uiLayers>0)uiLayers--;}
+function overlay(html,cb){const d=document.createElement('div');d.className='modal';d.innerHTML=html;document.body.appendChild(d);openUILayer();if(cb)cb(d);return d;}
+function closeOverlay(d){
+  if(d&&d.parentNode){
+    if(!suppressDraftFlush && d.querySelector('#f_label')){ // 关闭编辑器前先把草稿落盘，避免“退出即丢失”
+      try{const obj=captureDraft();if(obj&&(obj.label||obj.url||obj.note||obj.qrText||(obj.users&&obj.users.length)))saveDraft(obj);}catch(e){}
+    }
+    clearTimeout(draftTimer); // 取消挂起的（可能为空）草稿保存
+    d.remove();
+  }
+  suppressDraftFlush=false;
+  popUILayer();
+}
+/* 拦截安卓系统返回键：有弹窗/抽屉则关闭并补回历史栈（不退出），无则允许退出 */
+window.addEventListener('popstate',()=>{
+  const modal=document.querySelector('.modal');
+  if(modal){closeOverlay(modal);history.pushState({u:uiLayers},'');return;}
+  const drawer=$('#side')?.classList.contains('open');
+  if(drawer){closeDrawerNoCount();history.pushState({u:uiLayers},'');return;}
+});
+/* 切后台/关闭页面时若有编辑器开着，立即存草稿（防彻底丢失） */
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='hidden'&&document.querySelector('#f_label')){try{clearTimeout(draftTimer);await saveDraft(captureDraft());}catch(e){}}
+});
 function showQR(text){const m=overlay(`<div class="box"><h3>二维码</h3><div class="qrbox" id="qrc"></div><div class="hint" style="margin-top:8px;word-break:break-all">${esc(text)}</div><div class="foot"><button class="btn ghost" id="c">关闭</button></div></div>`);new QRCode($('#qrc'),{text,width:220,height:220});$('#c').onclick=()=>closeOverlay(m);}
 async function copyText(text){if(!text)return;try{await navigator.clipboard.writeText(text);}catch(e){const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();}
   toast('已复制');logAction('copy');const sec=state.data.settings?.clipboardClear||0;if(sec>0)setTimeout(()=>{try{navigator.clipboard.writeText('');}catch(e){}},sec*1000);}

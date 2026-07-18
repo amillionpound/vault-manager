@@ -1,0 +1,41 @@
+name: Sync from Gitee
+
+# 背景：沙箱/本机都连不上 github.com:443，无法直接 push GitHub。
+# 但沙箱能稳定 push gitee（PAT 嵌在 remote URL）。本 Action 跑在 GitHub 自己的
+# 服务器上，从 gitee 拉取最新代码并推回 GitHub，从而触发 deploy.yml 自动部署
+# Pages(前端) + SCF(后端)。完全绕开沙箱/本机的网络限制。
+#
+# 触发方式（二选一）：
+#   1) 手动（默认）：GitHub → vault-manager → Actions → Sync from Gitee → Run workflow
+#      （对应"实在推送超时时，我手工点击推送"）
+#   2) 自动：在 gitee 仓库设置 WebHook，Push 事件调 GitHub repository_dispatch
+#      URL: https://api.github.com/repos/amillionpound/vault-manager/dispatches
+#      Header: Authorization: token <GH_PAT>
+#      Body:  {"event_type":"sync-from-gitee"}
+#
+# 所需 Secrets（在 GitHub 仓库 Settings → Secrets 添加，一次性）：
+#   GITEE_PAT  : gitee 个人令牌（拥有 vault-manager 仓库 push 权限）
+#   GH_PAT     : GitHub 个人令牌（repo 权限，建议外加 workflow 权限）
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [sync-from-gitee]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror gitee → github
+        env:
+          GITEE_REPO: https://millionpound:${{ secrets.GITEE_PAT }}@gitee.com/millionpound/vault-manager.git
+          GH_REPO:    https://amillionpound:${{ secrets.GH_PAT }}@github.com/amillionpound/vault-manager.git
+        run: |
+          git config --global user.email "sync@vault-manager.local"
+          git config --global user.name  "gitee-sync"
+          echo "Cloning from gitee..."
+          git clone --mirror "$GITEE_REPO" mirror
+          cd mirror
+          echo "Pushing to github (triggers deploy.yml)..."
+          git push --mirror "$GH_REPO"
+          echo "DONE: gitee -> github sync complete"

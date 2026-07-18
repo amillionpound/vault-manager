@@ -236,10 +236,12 @@ async function binGet(path){
 }
 
 /* ============== 存取密文 ============== */
-async function loadVault(){const r=await api('/api/vault');if(r.data.code===0&&r.data.cipher){try{state.data=await decryptJSON(state.vaultKey,r.data.cipher);}catch(e){state.data=newVault();toast('无法解密原有数据（密钥已变更），已显示空白，可通过「设置→导入加密备份」恢复',true);}}else state.data=newVault();}
-async function saveVault(){const c=await encryptJSON(state.vaultKey,state.data);const r=await api('/api/vault',{method:'PUT',body:{cipher:c}});if(r.data.code!==0)throw new Error(r.data.msg||('保存失败('+(r.status||r.data.code)+')'));return r;}
-async function loadSecret(){const r=await api('/api/secret');if(r.data.code===0&&r.data.cipher){try{state.secret=await decryptJSON(state.secretKey,r.data.cipher);}catch(e){state.secret=newSecret();toast('绝密区数据无法解密（密钥不匹配），已显示空白，可用「设置→导入加密备份」恢复',true);}}else state.secret=newSecret();}
-async function saveSecret(){const c=await encryptJSON(state.secretKey,state.secret);const r=await api('/api/secret',{method:'PUT',body:{cipher:c}});if(r.data.code!==0)throw new Error(r.data.msg||('保存失败('+(r.status||r.data.code)+')'));return r;}
+let gLoadFailed=false;   // 普通区本次解密是否失败（用于禁止覆盖远端）
+let gSecretFailed=false; // 绝密区本次解密是否失败
+async function loadVault(){const r=await api('/api/vault');if(r.data.code===0&&r.data.cipher){try{state.data=await decryptJSON(state.vaultKey,r.data.cipher);gLoadFailed=false;}catch(e){state.data=newVault();gLoadFailed=true;toast('无法解密原有数据（密钥不匹配/已变更）。请重新输入主密码解锁，或在「设置→导入加密备份」恢复',true);}}else{state.data=newVault();gLoadFailed=false;}return !gLoadFailed;}
+async function saveVault(){if(gLoadFailed)throw new Error('当前数据未能解密加载，保存会覆盖远端数据。请先重新登录或导入备份');const c=await encryptJSON(state.vaultKey,state.data);const r=await api('/api/vault',{method:'PUT',body:{cipher:c}});if(r.data.code!==0)throw new Error(r.data.msg||('保存失败('+(r.status||r.data.code)+')'));gLoadFailed=false;return r;}
+async function loadSecret(){const r=await api('/api/secret');if(r.data.code===0&&r.data.cipher){try{state.secret=await decryptJSON(state.secretKey,r.data.cipher);gSecretFailed=false;}catch(e){state.secret=newSecret();gSecretFailed=true;toast('绝密区数据无法解密（密钥不匹配）。请重新输入绝密密码，或在「设置→导入加密备份」恢复',true);}}else{state.secret=newSecret();gSecretFailed=false;}return !gSecretFailed;}
+async function saveSecret(){if(gSecretFailed)throw new Error('绝密区数据未能解密加载，保存会覆盖远端数据。请先重新解锁或导入备份');const c=await encryptJSON(state.secretKey,state.secret);const r=await api('/api/secret',{method:'PUT',body:{cipher:c}});if(r.data.code!==0)throw new Error(r.data.msg||('保存失败('+(r.status||r.data.code)+')'));gSecretFailed=false;return r;}
 function newVault(){return{categories:[],entries:[],trash:[],logs:[],settings:{clipboardClear:15,theme:'light'}};}
 function newSecret(){return{entries:[],trash:[],logs:[]};}
 
@@ -261,7 +263,8 @@ async function tryAutoUnlock(){
   const r=await api('/api/auth');
   if(r.data.code!==0)return false;
   state.auth=r.data.auth;
-  try{await loadVault();}catch(e){return false;}
+  const ok=await loadVault();
+  if(!ok){clearSession();return false;} // 解密失败：清掉过期密钥会话，退回登录页重新派生
   return true;
 }
 
@@ -283,7 +286,8 @@ async function doLogin(pw,totp){
     const kekM=await deriveKey(pw,state.auth.saltM);
     state.vaultKey=await unwrapDEK(kekM,state.auth.wrapNormalByMaster);
     cacheSession();
-    await loadVault();
+    const ok=await loadVault();
+    if(!ok)return{err:'主密码无法解密现有数据（密钥可能已变更）。请在「设置→导入加密备份」恢复，或用恢复密码解锁。'};
     return{ok:true};
   }catch(e){
     const msg=((e&&e.message)||e)+'';
@@ -316,7 +320,7 @@ async function doSetup(pw,secretPw,recoveryPw){
   state.accessToken=r.data.token;state.accessExp=now()+ACCESS_MS;state.refreshToken=r.data.refreshToken;
   state.auth={saltM,...extra};if(saltS)state.auth.saltS=saltS;if(wrapSecretBySecret)state.auth.wrapSecretBySecret=wrapSecretBySecret;
   state.vaultKey=dekN;cacheSession();
-  state.data=newVault();
+  state.data=newVault();gLoadFailed=false;
   return{ok:true};
 }
 /* doForceReset 已移除：重置系统功能不再在登录页暴露（防误触/社工风险）。
@@ -351,7 +355,7 @@ async function doRepairBootstrap(loginPw){
     state.auth={saltM,wrapNormalByMaster,...(saltR?{saltR,wrapNormalByRecovery}:{}),...(saltS?{saltS,wrapSecretBySecret}:{})};
     state.vaultKey=vaultKey;
     cacheSession();
-    state.data=newVault();
+    state.data=newVault();gLoadFailed=false;
     if(secretPw)state.secret=newSecret();
     // 只修复 auth.json（覆盖不完整的认证参数），不覆盖 COS 上的 vault 密文，保留用户原有数据以便后续导入备份恢复
     return{ok:true};
@@ -363,7 +367,9 @@ async function unlockSecret(secretPw){
   const kekS=await deriveKey(secretPw,state.auth.saltS);
   try{state.secretKey=await unwrapDEK(kekS,state.auth.wrapSecretBySecret);}
   catch(e){return{err:'绝密密码错误'};}
-  await loadSecret();return{ok:true};
+  const ok=await loadSecret();
+  if(!ok)return{err:'绝密密码正确，但现有绝密数据无法解密（可能曾被重置）。可用「设置→导入加密备份」恢复'};
+  return{ok:true};
 }
 
 /* ============== 渲染 ============== */

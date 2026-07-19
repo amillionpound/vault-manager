@@ -372,9 +372,9 @@ def force_reset():
             cos_delete(k)
         except Exception:
             pass
-        # 兜底：若删除无权限，覆盖写入无效内容使 load_auth 返回 None（触发重新初始化）
+        # 兜底：若删除无权限，覆盖写入 null 使 load_auth 返回 None（触发重新初始化）
         try:
-            cos_put(k, b'')
+            cos_put(k, b'null')
         except Exception:
             pass
     try:
@@ -383,6 +383,12 @@ def force_reset():
     except Exception:
         pass
     return jsonify({'code': 0, 'ok': True, 'need_setup': True})
+
+
+@app.route('/api/dev_status', methods=['GET'])
+def dev_status():
+    auth = load_auth()
+    return jsonify({'auth_exists': auth is not None, 'auth_has_loginHash': bool(auth and auth.get('loginHash'))})
 
 
 # ---------- 登录：SHA-256 比对 + 限流锁定 + IP 记录 + 双令牌 ----------

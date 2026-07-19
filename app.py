@@ -470,7 +470,15 @@ def get_vault():
     if not auth_payload():
         return jsonify({'code': 1, 'msg': '未登录'}), 401
     data = cos_get(VAULT_KEY)
-    return jsonify({'code': 0, 'cipher': b64u_encode(data) if data else None})
+    # 密文以 UTF-8 文本存储，直接返回字符串（前端 decryptJSON 会按 : 拆分并分别 b64u 解码）
+    if data:
+        try:
+            cipher = data.decode('utf-8')
+        except Exception:
+            cipher = b64u_encode(data)
+    else:
+        cipher = None
+    return jsonify({'code': 0, 'cipher': cipher})
 
 
 @app.route('/api/vault', methods=['PUT'])
@@ -481,9 +489,9 @@ def put_vault():
     cipher_b64 = d.get('cipher', '')
     if not cipher_b64:
         return jsonify({'code': 2, 'msg': '缺少密文'}), 400
+    # 前端密文格式为 b64url(iv):b64url(密文)——已是文本编码，直接存 UTF-8 不再做 base64 解码
     try:
-        raw = b64u_decode(cipher_b64)
-        cos_put(VAULT_KEY, raw)
+        cos_put(VAULT_KEY, cipher_b64.encode('utf-8'))
     except Exception as e:
         return jsonify({'code': -1, 'msg': f'保存失败(COS): {str(e)[:200]}'}), 500
     return jsonify({'code': 0, 'ok': True})
@@ -494,7 +502,14 @@ def get_secret():
     if not auth_payload():
         return jsonify({'code': 1, 'msg': '未登录'}), 401
     data = cos_get(SECRET_KEY)
-    return jsonify({'code': 0, 'cipher': b64u_encode(data) if data else None})
+    if data:
+        try:
+            cipher = data.decode('utf-8')
+        except Exception:
+            cipher = b64u_encode(data)
+    else:
+        cipher = None
+    return jsonify({'code': 0, 'cipher': cipher})
 
 
 @app.route('/api/secret', methods=['PUT'])
@@ -506,8 +521,7 @@ def put_secret():
     if not cipher_b64:
         return jsonify({'code': 2, 'msg': '缺少密文'}), 400
     try:
-        raw = b64u_decode(cipher_b64)
-        cos_put(SECRET_KEY, raw)
+        cos_put(SECRET_KEY, cipher_b64.encode('utf-8'))
     except Exception as e:
         return jsonify({'code': -1, 'msg': f'保存失败(COS): {str(e)[:200]}'}), 500
     return jsonify({'code': 0, 'ok': True})

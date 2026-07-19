@@ -265,7 +265,7 @@ async function doClearRemoteVault(){
     hideVaultRecoverBar();
     toast('远端数据已清空，可以正常使用了');
     state.data=newVault();state.secret=newSecret();
-    renderAll(); // 立即渲染空状态
+    render(); // 立即渲染空状态
   }catch(e){
     toast('清空失败: '+e.message,true);
   }

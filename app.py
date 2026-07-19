@@ -41,6 +41,13 @@ if os.path.isdir(VENDOR):
 
 app = Flask(__name__)
 
+# 全局异常处理：确保 API 路由永远返回 JSON（不返回 HTML 500）
+@app.errorhandler(Exception)
+def _json_error(e):
+    resp = jsonify({'code': -1, 'msg': f'服务器内部错误: {str(e)[:200]}'})
+    resp.status_code = 500
+    return resp
+
 # CORS：前端托管在 GitHub Pages / CloudStudio（与 SCF 不同源）
 @app.after_request
 def _cors(resp):
@@ -474,7 +481,11 @@ def put_vault():
     cipher_b64 = d.get('cipher', '')
     if not cipher_b64:
         return jsonify({'code': 2, 'msg': '缺少密文'}), 400
-    cos_put(VAULT_KEY, b64u_decode(cipher_b64))
+    try:
+        raw = b64u_decode(cipher_b64)
+        cos_put(VAULT_KEY, raw)
+    except Exception as e:
+        return jsonify({'code': -1, 'msg': f'保存失败(COS): {str(e)[:200]}'}), 500
     return jsonify({'code': 0, 'ok': True})
 
 
@@ -494,7 +505,11 @@ def put_secret():
     cipher_b64 = d.get('cipher', '')
     if not cipher_b64:
         return jsonify({'code': 2, 'msg': '缺少密文'}), 400
-    cos_put(SECRET_KEY, b64u_decode(cipher_b64))
+    try:
+        raw = b64u_decode(cipher_b64)
+        cos_put(SECRET_KEY, raw)
+    except Exception as e:
+        return jsonify({'code': -1, 'msg': f'保存失败(COS): {str(e)[:200]}'}), 500
     return jsonify({'code': 0, 'ok': True})
 
 

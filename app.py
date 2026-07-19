@@ -478,6 +478,9 @@ def get_vault():
             cipher = b64u_encode(data)
     else:
         cipher = None
+    # 防御：空内容或字面量 "null" 当作无数据（clear_vault_data 兜底写空所致）
+    if not cipher or cipher == 'null':
+        cipher = None
     return jsonify({'code': 0, 'cipher': cipher})
 
 
@@ -508,6 +511,8 @@ def get_secret():
         except Exception:
             cipher = b64u_encode(data)
     else:
+        cipher = None
+    if not cipher or cipher == 'null':
         cipher = None
     return jsonify({'code': 0, 'cipher': cipher})
 
@@ -645,8 +650,9 @@ def clear_vault_data():
         return jsonify({'code': 1, 'msg': '未登录'}), 401
     for k in (VAULT_KEY, SECRET_KEY):
         cos_delete(k)
+        # 兜底：用空内容覆盖（而非 b'null'），确保 GET 返回 None/空，前端当作无数据
         try:
-            cos_put(k, b'null')
+            cos_put(k, b'')
         except Exception:
             pass
     return jsonify({'code': 0, 'ok': True})

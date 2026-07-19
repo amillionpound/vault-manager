@@ -309,17 +309,15 @@ def health():
     return jsonify(out)
 
 
-# ---------- 首次引导：环境 ADMIN_PWD 防陌生人抢注，写入 auth.json 后环境哈希即失效 ----------
+# ---------- 首次引导：auth.json 不存在时允许直接设新主密码（重置后可无缝初始化）；已存在则拒绝 ----------
 @app.route('/api/bootstrap', methods=['POST'])
 def bootstrap():
-    if not ADMIN_PWD_HASH:
-        return jsonify({'code': 3, 'msg': 'SCF 未配置 ADMIN_PWD 环境变量，无法初始化（请用自算密钥工具对管理员密码算 SHA-256 hex 后填入）'}), 400
     if load_auth() is not None:
         return jsonify({'code': 5, 'msg': '已初始化，无需再次引导'}), 400
     d = get_json()
     pw = (d.get('loginHash') or '').strip().lower()
-    if pw != ADMIN_PWD_HASH:
-        return jsonify({'code': 1, 'msg': '环境 ADMIN_PWD 不匹配'}), 403
+    # 首次引导不再强制 ADMIN_PWD：个人 vault 重置后可直接设新主密码。
+    # ADMIN_PWD 仅用于 repair_bootstrap（修复已存在 auth 的不完整数据）。
     fields = ('loginHash', 'saltM', 'saltR', 'saltS', 'wrapNormalByMaster', 'wrapNormalByRecovery', 'wrapSecretBySecret', 'recoveryId', 'recoveryHash')
     obj = {k: d[k] for k in fields if k in d}
     obj['updatedAt'] = int(time.time())
@@ -363,8 +361,7 @@ def force_reset():
         return jsonify({'code': 3, 'msg': 'SCF 未配置 ADMIN_PWD，无法重置（请在环境变量设置 ADMIN_PWD 自算密钥 hex）'}), 400
     d = get_json()
     pw = (d.get('pwHash') or '').strip().lower()
-    dev = (d.get('devReset') or '').strip()
-    if pw != ADMIN_PWD_HASH and dev != 'CLEAR_TEST_VAULT_2026':
+    if pw != ADMIN_PWD_HASH:
         return jsonify({'code': 1, 'msg': '管理员密码(ADMIN_PWD)错误'}), 403
     # 清库：删除所有数据对象（普通区/绝密区/登录态/服务端状态/上传/分享）
     for k in (AUTH_KEY, SYS_KEY, VAULT_KEY, SECRET_KEY):
@@ -385,12 +382,6 @@ def force_reset():
     return jsonify({'code': 0, 'ok': True, 'need_setup': True})
 
 
-@app.route('/api/dev_status', methods=['GET'])
-def dev_status():
-    auth = load_auth()
-    return jsonify({'auth_exists': auth is not None, 'auth_has_loginHash': bool(auth and auth.get('loginHash'))})
-
-
 # ---------- 登录：SHA-256 比对 + 限流锁定 + IP 记录 + 双令牌 ----------
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -404,10 +395,8 @@ def login():
         return jsonify({'code': 1, 'msg': '缺少密码哈希'}), 400
     auth = load_auth()
     if auth is None:
-        # 尚未初始化：若环境哈希匹配，提示前端走引导流程
-        if ADMIN_PWD_HASH and pw == ADMIN_PWD_HASH:
-            return jsonify({'code': 4, 'msg': '首次使用，请初始化', 'need_setup': True})
-        return jsonify({'code': 1, 'msg': '密码错误'}), 401
+        # 尚未初始化：直接提示前端走引导流程（重置后可无缝设新密码，不卡 ADMIN_PWD）
+        return jsonify({'code': 4, 'msg': '首次使用，请初始化', 'need_setup': True})
     if pw != auth.get('loginHash', ''):
         sys['fails'] = sys.get('fails', 0) + 1
         if sys['fails'] >= _MAX_FAILS:

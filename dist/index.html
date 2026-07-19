@@ -75,6 +75,9 @@ a{color:var(--brand)}
 .modal .foot{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1c2330;color:#fff;padding:10px 18px;border-radius:10px;z-index:99;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
 .toast.show{opacity:1}
+.vault-recover-bar{position:fixed;left:10px;right:10px;bottom:80px;background:#fff1f0;border:1px solid #e5484d;color:#5c0000;padding:12px 14px;border-radius:12px;z-index:98;font-size:13px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;box-shadow:0 4px 16px rgba(229,72,77,.15)}
+[data-theme=dark] .vault-recoverbar{background:#2a1515;border-color:#e5484d;color:#ffb3b3}
+.vault-recover-bar .btn{flex-shrink:0;margin-left:auto}
 .secret-badge{background:var(--danger);color:#fff;font-size:11px;padding:2px 7px;border-radius:6px}
 .tabs{display:flex;gap:6px;margin-bottom:14px}
 .tab{padding:7px 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel);font-size:13px}
@@ -151,6 +154,10 @@ a{color:var(--brand)}
 </div>
 
 <div id="toast" class="toast"></div>
+<div id="vault-recover-bar" class="vault-recover-bar" style="display:none">
+  <span>⚠️ 远端数据无法解密（可能是之前保存时写入的损坏数据）。点下方按钮清空远端密文，即可重新开始使用（账号不会丢失）。</span>
+  <button class="btn sm danger" id="btn-clear-remote">清空远端数据重新开始</button>
+</div>
 
 <script>
 "use strict";
@@ -238,12 +245,35 @@ async function binGet(path){
 /* ============== 存取密文 ============== */
 let gLoadFailed=false;   // 普通区本次解密是否失败（用于禁止覆盖远端）
 let gSecretFailed=false; // 绝密区本次解密是否失败
-async function loadVault(){const r=await api('/api/vault');if(r.data.code===0&&r.data.cipher){try{state.data=await decryptJSON(state.vaultKey,r.data.cipher);gLoadFailed=false;}catch(e){state.data=newVault();gLoadFailed=true;toast('无法解密原有数据（密钥不匹配/已变更）。请重新输入主密码解锁，或在「设置→导入加密备份」恢复',true);}}else{state.data=newVault();gLoadFailed=false;}return !gLoadFailed;}
+async function loadVault(){const r=await api('/api/vault');if(r.data.code===0&&r.data.cipher){try{state.data=await decryptJSON(state.vaultKey,r.data.cipher);gLoadFailed=false;hideVaultRecoverBar();}catch(e){state.data=newVault();gLoadFailed=true;toast('无法解密原有数据（密钥不匹配/已变更）',true);showVaultRecoverBar();}}else{state.data=newVault();gLoadFailed=false;hideVaultRecoverBar();}return !gLoadFailed;}
 async function saveVault(){if(gLoadFailed)throw new Error('当前数据未能解密加载，保存会覆盖远端数据。请先重新登录或导入备份');const c=await encryptJSON(state.vaultKey,state.data);const r=await api('/api/vault',{method:'PUT',body:{cipher:c}});if(r.data.code!==0)throw new Error(r.data.msg||('保存失败('+(r.status||r.data.code)+')'));gLoadFailed=false;return r;}
 async function loadSecret(){const r=await api('/api/secret');if(r.data.code===0&&r.data.cipher){try{state.secret=await decryptJSON(state.secretKey,r.data.cipher);gSecretFailed=false;}catch(e){state.secret=newSecret();gSecretFailed=true;toast('绝密区数据无法解密（密钥不匹配）。请重新输入绝密密码，或在「设置→导入加密备份」恢复',true);}}else{state.secret=newSecret();gSecretFailed=false;}return !gSecretFailed;}
 async function saveSecret(){if(gSecretFailed)throw new Error('绝密区数据未能解密加载，保存会覆盖远端数据。请先重新解锁或导入备份');const c=await encryptJSON(state.secretKey,state.secret);const r=await api('/api/secret',{method:'PUT',body:{cipher:c}});if(r.data.code!==0)throw new Error(r.data.msg||('保存失败('+(r.status||r.data.code)+')'));gSecretFailed=false;return r;}
 function newVault(){return{categories:[],entries:[],trash:[],logs:[],settings:{clipboardClear:15,theme:'light'}};}
 function newSecret(){return{entries:[],trash:[],logs:[]};}
+
+/* ============== 远端数据损坏恢复 ============== */
+function showVaultRecoverBar(){$('#vault-recover-bar').style.display='';}
+function hideVaultRecoverBar(){$('#vault-recover-bar').style.display='none';}
+async function doClearRemoteVault(){
+  if(!confirm('确定要清空远端保险库和绝密区密文吗？\n\n这将删除 COS 上存储的加密数据，让你可以从空白状态重新开始。\n\n你的登录账号（密码/凭据）不会丢失。'))return;
+  try{
+    const r=await api('/api/clear_vault_data',{method:'POST'});
+    if(r.data.code!==0)throw new Error(r.data.msg||'清空失败('+r.data.code+')');
+    // 清空成功：重置标志，重新加载（远端已无数据 → 得到空 vault）
+    gLoadFailed=false;gSecretFailed=false;
+    hideVaultRecoverBar();
+    toast('远端数据已清空，可以正常使用了');
+    state.data=newVault();state.secret=newSecret();
+    renderAll(); // 立即渲染空状态
+  }catch(e){
+    toast('清空失败: '+e.message,true);
+  }
+}
+// 绑定按钮（DOM ready 时执行）
+document.addEventListener('DOMContentLoaded',()=>{
+  const btn=$('#btn-clear-remote');if(btn)btn.addEventListener('click',doClearRemoteVault);
+});
 
 /* ============== 登录态 / 解锁 ============== */
 function cacheSession(){

@@ -635,6 +635,23 @@ def recover_setnew():
     return jsonify({'code': 0, 'ok': True})
 
 
+# ---------- 清除远端密文（保留账号）：用于密文损坏/密钥不匹配时重新开始 ----------
+@app.route('/api/clear_vault_data', methods=['POST'])
+def clear_vault_data():
+    """只清除 vault.json / secret.json 密文，保留 auth.json 登录凭据。
+    适用场景：远端密文损坏（如 Incorrect padding）、密钥变更后无法解密。
+    前端 gLoadFailed 锁死写入时调用此接口可恢复写入能力。"""
+    if not auth_payload():
+        return jsonify({'code': 1, 'msg': '未登录'}), 401
+    for k in (VAULT_KEY, SECRET_KEY):
+        cos_delete(k)
+        try:
+            cos_put(k, b'null')
+        except Exception:
+            pass
+    return jsonify({'code': 0, 'ok': True})
+
+
 # ---------- 系统重置（factory wipe）：需手输 DELETE ----------
 @app.route('/api/reset', methods=['POST'])
 def reset():

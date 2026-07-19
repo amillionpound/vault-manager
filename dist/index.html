@@ -286,8 +286,7 @@ async function doLogin(pw,totp){
     const kekM=await deriveKey(pw,state.auth.saltM);
     state.vaultKey=await unwrapDEK(kekM,state.auth.wrapNormalByMaster);
     cacheSession();
-    const ok=await loadVault();
-    if(!ok)return{err:'主密码无法解密现有数据（密钥可能已变更）。请在「设置→导入加密备份」恢复，或用恢复密码解锁。'};
+    await loadVault(); // 解密失败不阻止登录——让用户先进来；gLoadFailed 标志会阻止误覆盖远端
     return{ok:true};
   }catch(e){
     const msg=((e&&e.message)||e)+'';

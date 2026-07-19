@@ -363,8 +363,7 @@ def force_reset():
         return jsonify({'code': 3, 'msg': 'SCF 未配置 ADMIN_PWD，无法重置（请在环境变量设置 ADMIN_PWD 自算密钥 hex）'}), 400
     d = get_json()
     pw = (d.get('pwHash') or '').strip().lower()
-    dev = (d.get('devReset') or '').strip()
-    if pw != ADMIN_PWD_HASH and dev != 'CLEAR_TEST_VAULT_2026':
+    if pw != ADMIN_PWD_HASH:
         return jsonify({'code': 1, 'msg': '管理员密码(ADMIN_PWD)错误'}), 403
     # 清库：删除所有数据对象（普通区/绝密区/登录态/服务端状态/上传/分享）
     for k in (AUTH_KEY, SYS_KEY, VAULT_KEY, SECRET_KEY):
